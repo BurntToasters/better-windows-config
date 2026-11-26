@@ -396,6 +396,18 @@ function compareKeys(a, b) {
 
 function writeAtomically(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  let existing;
+  try {
+    existing = fs.readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+  if (existing !== undefined && normalizeLines(existing) === normalizeLines(text)) {
+    return;
+  }
+
   const temp = `${file}.tmp`;
   fs.writeFileSync(temp, text, "utf8");
   fs.renameSync(temp, file);
