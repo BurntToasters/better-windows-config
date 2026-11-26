@@ -110,6 +110,9 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         }
     }
 
+    /// <summary>A close from the caption or Alt+F4 is refused while an Add or Remove is running.</summary>
+    protected override bool IsCloseAllowed() => !_busy;
+
     // ---- Add ----------------------------------------------------------------------------------------
 
     private void StartAdd()

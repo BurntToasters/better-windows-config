@@ -473,7 +473,7 @@ public sealed partial class GpeditRootView
     /// <summary>Reads the sort of each node from the settings. A column or direction that is not known is skipped.</summary>
     private void LoadSortStacks()
     {
-        foreach (KeyValuePair<string, List<string>> pair in _settings.Sorts)
+        foreach (KeyValuePair<string, List<string>> pair in _settings.Sorts ?? [])
         {
             var stack = new List<ConsoleListSortKey>();
             foreach (string entry in pair.Value ?? [])

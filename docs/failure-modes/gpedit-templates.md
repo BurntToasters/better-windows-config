@@ -57,6 +57,10 @@ Everything here is a decision of this file where the captures are silent. Each o
 - **One reload per closed dialog, only if something changed.** The tree, the list and the model reload once when the dialog closes
   after at least one successful Add or Remove, and not when nothing changed or every attempt was refused. The reload is the Refresh
   command (G2) and keeps the node that is selected.
+- **The caption X and Alt+F4 do not close the dialog while an Add or Remove runs (0.2.0 audit).** Close, Escape and Enter were
+  already ignored while busy, but the caption close was not: the dialog closed under the running operation, the main window was
+  enabled again while the operation still ran, and a refused Add or Remove lost its details box (the dialog was closed, so
+  nothing showed the reason). `IsCloseAllowed` is `!_busy`, as in the policy setting dialog.
 - **The dialog lists the store, not the system folder.** The list holds the files of the import store, one row per `.admx` file,
   ordered by file name (ordinal, ignoring case). System templates are never listed and never removable (E1).
 

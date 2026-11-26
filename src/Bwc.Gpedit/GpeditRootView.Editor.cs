@@ -84,7 +84,8 @@ public sealed partial class GpeditRootView
     private void InitializeEditor()
     {
         _settings = LoadSettings();
-        foreach (KeyValuePair<string, double> pair in _settings.ColumnWidths)
+        // A settings file may hold null for a map (hand edited, or from another build): the same as no entry.
+        foreach (KeyValuePair<string, double> pair in _settings.ColumnWidths ?? [])
         {
             if (IsUsableWidth(pair.Value))
             {
