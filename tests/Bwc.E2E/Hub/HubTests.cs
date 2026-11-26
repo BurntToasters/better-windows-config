@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 using System.Text.Json;
 using System.Runtime.InteropServices;
@@ -1153,6 +1154,7 @@ public sealed class HubTests
         using var automation = new UIA3Automation();
 
         string mainCapture = CaptureMain(hub, "main-light.png");
+        CheckToolIcons(hub, automation, mainCapture, "hub.main.light.icon");
         double lightBrightness = HubUi.AverageBrightness(mainCapture);
         E2EResults.Record(
             "hub.main.light",
@@ -1567,8 +1569,10 @@ public sealed class HubTests
 
         using var hub = new AppSession(config, config.HubExePath, environment: Environment(config, DarkScope, DarkTheme));
         E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
 
         string capture = CaptureMain(hub, "main-dark.png");
+        CheckToolIcons(hub, automation, capture, "hub.main.dark.icon");
         double brightness = HubUi.AverageBrightness(capture);
         E2EResults.Record(
             "hub.main.dark",
@@ -2295,6 +2299,65 @@ public sealed class HubTests
 
     private static string RecordField(Dictionary<string, string> record, string key) =>
         record.TryGetValue(key, out string? value) ? value : string.Empty;
+
+    private static void CheckToolIcons(AppSession hub, UIA3Automation automation, string capturePath, string checkPrefix)
+    {
+        var tools = new[] { ("regedit", "Registry Editor"), ("gpedit", "Local Group Policy Editor") };
+        if (string.IsNullOrWhiteSpace(capturePath) || !File.Exists(capturePath))
+        {
+            foreach ((string id, string name) in tools)
+            {
+                E2EResults.Record(checkPrefix + "." + id, false, $"{name} icon capture was missing.");
+            }
+
+            return;
+        }
+
+        using Bitmap capture = new(capturePath);
+        Rectangle frame = HubUi.CaptureFrameRect(hub.MainHwnd);
+        var imageBounds = new Rectangle(0, 0, capture.Width, capture.Height);
+        bool frameMatches = frame.Width == capture.Width && frame.Height == capture.Height;
+        foreach ((string id, string name) in tools)
+        {
+            AutomationElement? icon = HubUi.FindInProcess(automation, hub.ProcessId, "ToolIcon_" + id, ElementTimeout);
+            AutomationElement? row = HubUi.FindInProcess(automation, hub.ProcessId, "ToolRow_" + id, ElementTimeout);
+            Rectangle screenIcon = icon?.BoundingRectangle ?? Rectangle.Empty;
+            var iconPixels = new Rectangle(screenIcon.Left - frame.Left, screenIcon.Top - frame.Top, screenIcon.Width, screenIcon.Height);
+            var backgroundScreen = new Point(screenIcon.Left - 2, screenIcon.Top + screenIcon.Height / 2);
+            var backgroundPixel = new Point(backgroundScreen.X - frame.Left, backgroundScreen.Y - frame.Top);
+            if (!frameMatches || icon is null || row is null || screenIcon.Width <= 0 || screenIcon.Height <= 0
+                || Rectangle.Intersect(iconPixels, imageBounds) != iconPixels
+                || !imageBounds.Contains(backgroundPixel)
+                || !row.BoundingRectangle.Contains(backgroundScreen))
+            {
+                E2EResults.Record(checkPrefix + "." + id, false, $"{name} UIA icon rectangle {screenIcon} was outside the saved Hub capture.");
+                continue;
+            }
+
+            Color background = capture.GetPixel(backgroundPixel.X, backgroundPixel.Y);
+            var colors = new HashSet<int>();
+            int nonBackgroundPixels = 0;
+            for (int y = iconPixels.Top; y < iconPixels.Bottom; y++)
+            {
+                for (int x = iconPixels.Left; x < iconPixels.Right; x++)
+                {
+                    Color pixel = capture.GetPixel(x, y);
+                    int distance = Math.Abs(pixel.R - background.R) + Math.Abs(pixel.G - background.G) + Math.Abs(pixel.B - background.B);
+                    if (distance >= 24)
+                    {
+                        nonBackgroundPixels++;
+                        colors.Add(pixel.ToArgb());
+                    }
+                }
+            }
+
+            bool visible = nonBackgroundPixels >= 8 && colors.Count >= 2;
+            E2EResults.Record(
+                checkPrefix + "." + id,
+                visible,
+                $"{name} UIA icon rectangle {screenIcon} contains {nonBackgroundPixels} nonbackground pixels across {colors.Count} colors; row background is {background}.");
+        }
+    }
 
     private static string CaptureMain(AppSession hub, string fileName)
     {

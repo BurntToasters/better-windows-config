@@ -9,7 +9,7 @@ namespace Bwc.Hub.Tools;
 /// <summary>
 /// The tool list the Hub shows. The registry is <see cref="ToolCatalog"/>; this class adds only what
 /// the Hub displays: the description text from the resource file, the install status, and the icon
-/// read from the tool executable.
+/// read from the shipped icon for each known tool.
 /// </summary>
 internal static class HubTools
 {
@@ -36,8 +36,8 @@ internal static class HubTools
     public static string LaunchAutomationId(ToolCatalog.Tool tool) => "Launch_" + tool.Id;
 
     /// <summary>
-    /// The icon of the tool executable, read through the shell at <paramref name="size"/> pixels.
-    /// Returns null when the file is missing or the shell has no image for it.
+    /// The icon of a known tool is decoded from its adjacent ICO file. Unknown future tools use the
+    /// shell thumbnail fallback. Returns null when the executable is missing or no icon is available.
     /// </summary>
     public static async Task<ImageSource?> LoadIconAsync(ToolCatalog.Tool tool, int size)
     {
@@ -49,6 +49,21 @@ internal static class HubTools
 
         try
         {
+            string? iconName = tool.Id switch
+            {
+                "regedit" => "bwc-regedit.ico",
+                "gpedit" => "bwc-gpo.ico",
+                _ => null,
+            };
+            if (iconName is not null)
+            {
+                StorageFile iconFile = await StorageFile.GetFileFromPathAsync(Path.Combine(AppContext.BaseDirectory, iconName));
+                using var stream = await iconFile.OpenReadAsync();
+                var iconBitmap = new BitmapImage { DecodePixelWidth = size, DecodePixelHeight = size };
+                await iconBitmap.SetSourceAsync(stream);
+                return iconBitmap;
+            }
+
             StorageFile file = await StorageFile.GetFileFromPathAsync(path);
             using StorageItemThumbnail thumbnail = await file.GetThumbnailAsync(
                 ThumbnailMode.SingleItem,
