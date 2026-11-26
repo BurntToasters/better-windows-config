@@ -143,6 +143,21 @@ internal static class HubUi
         return false;
     }
 
+    /// <summary>Counts the currently visible top-level windows with a title in the target process.</summary>
+    public static int CountWindowsInProcess(UIA3Automation automation, int processId, string title)
+    {
+        int count = 0;
+        foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
+        {
+            if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public static string TextOf(AutomationElement element)
     {
         try

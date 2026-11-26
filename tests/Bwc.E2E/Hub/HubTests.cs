@@ -54,6 +54,12 @@ public sealed class HubTests
     private const string MigrateScope = "hub-migrate";
     private const string KeepOffScope = "hub-keepoff";
     private const string StartupScope = "hub-startup";
+    private const string ModalAboutScope = "hub-modal-about";
+    private const string ModalSettingsScope = "hub-modal-settings";
+    private const string ModalResultScope = "hub-modal-result";
+    private const string HandoverScope = "hub-modal-handover";
+    private const string CloseCheckScope = "hub-close-check";
+    private const string CloseDownloadScope = "hub-close-download";
     private const string ResultScope = "hub-result";
     private const string InstalledHubCapture = "update-installed-hub.png";
     private const string FakeInstallerRecordVariable = "BWC_E2E_INSTALLER_RECORD";
@@ -66,6 +72,7 @@ public sealed class HubTests
     private const string UpdateResultArgument = "--update-result";
     private const string InstallerFailedCode = "InstallerFailed";
     private const string UnexpectedCode = "Unexpected";
+    private const uint WindowCloseMessage = 0x0010;
     private const string BoundsScope = "hub-bounds";
     private const string CheckFinishedLine = "Update check finished: UpToDate.";
     private const string SettingsFileName = "settings.json";
@@ -436,6 +443,321 @@ public sealed class HubTests
         AssertNoFailures("Hub startup check checks");
     }
 
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_StartupOfferWaitsForAboutAndSettings()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+
+        CheckStartupOfferWaitsForDialog(
+            config,
+            ModalAboutScope,
+            "MenuItem_About",
+            AboutTitle,
+            "AboutOk",
+            "hub.modal.about");
+        CheckStartupOfferWaitsForDialog(
+            config,
+            ModalSettingsScope,
+            "MenuItem_UpdateSettings",
+            SettingsTitle,
+            "UpdateSettingsCancel",
+            "hub.modal.settings");
+
+        AssertNoFailures("Hub startup modal serialization checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_StartupManualHandoverShowsOneResultAfterProgress()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string installed = ReadSemVer(config);
+        string dataRoot = config.DataRootFor(HandoverScope);
+
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+        server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+        server.HoldManifest();
+
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, HandoverScope, null, server, fixture, startupCheckOn: true));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        bool startupRequested = server.WaitForManifestRequests(1, DialogTimeout);
+        E2EResults.Record(
+            "hub.modal.handover.startupRequest",
+            startupRequested,
+            startupRequested ? "The startup check reached the held fixture manifest." : "The startup check never requested the fixture manifest.");
+
+        RunCheck(hub, automation);
+        AutomationElement? progress = HubUi.FindWindowWithChild(automation, hub.ProcessId, CheckTitle, "UpdateProgressText", DialogTimeout);
+        E2EResults.Record(
+            "hub.modal.handover.progress",
+            progress is not null,
+            progress is null ? "Manual check progress did not appear." : "Manual check progress appeared while the startup check was running.");
+        E2EResults.Record(
+            "hub.modal.handover.progressOwnerDisabled",
+            !hub.IsEnabled,
+            "The Hub owner stays disabled while manual progress is open.");
+
+        server.ReleaseManifest();
+        bool finished = WaitForHubLog(dataRoot, "Update check finished: Available.", DialogTimeout);
+        E2EResults.Record(
+            "hub.modal.handover.checkFinished",
+            finished,
+            finished ? "The handed-over startup check finished with an update offer." : "The startup check did not finish with an update offer.");
+
+        AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
+        int resultWindows = HubUi.CountWindowsInProcess(automation, hub.ProcessId, AvailableTitle);
+        bool progressClosed = HubUi.FindWindowWithChild(
+            automation,
+            hub.ProcessId,
+            CheckTitle,
+            "UpdateProgressText",
+            TimeSpan.FromMilliseconds(500)) is null;
+        E2EResults.Record(
+            "hub.modal.handover.progressClosedBeforeResult",
+            progressClosed,
+            "The progress modal closes before the handed-over result is shown.");
+        E2EResults.Record(
+            "hub.modal.handover.singleResult",
+            available is not null && resultWindows == 1,
+            $"After progress, Update Available windows={resultWindows}; exactly one result must appear.");
+        E2EResults.Record(
+            "hub.modal.handover.resultOwnerDisabled",
+            !hub.IsEnabled,
+            "The Hub stays disabled while the handed-over result is open.");
+
+        AutomationElement? later = available is null ? null : HubUi.WaitWithin(available, "UpdateLater", DialogTimeout);
+        if (later is not null)
+        {
+            HubUi.InvokeButton(later);
+        }
+
+        E2EResults.Record(
+            "hub.modal.handover.ownerRestored",
+            ControlTestSupport.WaitUntil(() => hub.IsEnabled, DialogTimeout),
+            "The Hub is restored after the only result closes.");
+
+        hub.Close();
+        AssertNoFailures("Hub startup/manual handover checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_UpdateResultWaitsForExistingModal()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        string dataRoot = config.DataRootFor(ModalResultScope);
+
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+        server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+        server.HoldManifest();
+
+        using Process process = StartHubWithArguments(
+            config,
+            Environment(config, ModalResultScope, null, server, fixture, startupCheckOn: true),
+            UpdateResultArgument,
+            InstallerFailedCode);
+        try
+        {
+            using var automation = new UIA3Automation();
+            AutomationElement? main = HubUi.FindWindowInProcess(automation, process.Id, HubTitle, ElementTimeout);
+            IntPtr mainHwnd = main is null ? IntPtr.Zero : (IntPtr)main.Properties.NativeWindowHandle.ValueOrDefault;
+            AutomationElement? result = HubUi.FindWindowWithChild(automation, process.Id, NotInstalledTitle, "DialogMessage", DialogTimeout);
+            bool startupRequested = server.WaitForManifestRequests(1, DialogTimeout);
+            E2EResults.Record(
+                "hub.modal.result.initial",
+                main is not null && result is not null && startupRequested,
+                $"main={main is not null}, update result={result is not null}, startup manifest requested={startupRequested}.");
+
+            server.ReleaseManifest();
+            bool checkFinished = WaitForHubLog(dataRoot, "Update check finished: Available.", DialogTimeout);
+            E2EResults.Record(
+                "hub.modal.result.checkFinished",
+                checkFinished,
+                checkFinished ? "The startup offer completed while the update-result dialog was open." : "The startup offer did not finish.");
+            AutomationElement? prematureOffer = HubUi.FindWindowInProcess(automation, process.Id, AvailableTitle, NoDialogWindow);
+            E2EResults.Record(
+                "hub.modal.result.queued",
+                prematureOffer is null && mainHwnd != IntPtr.Zero && !Bwc.E2E.Harness.Win32.IsWindowEnabled(mainHwnd),
+                prematureOffer is null
+                    ? "No update offer appeared over the update-result dialog, and the owner stayed disabled."
+                    : "Update Available appeared over Update Not Installed.");
+
+            AutomationElement? ok = result is null ? null : HubUi.WaitWithin(result, "DialogPrimary", DialogTimeout);
+            if (ok is not null)
+            {
+                HubUi.InvokeButton(ok);
+            }
+
+            AutomationElement? available = HubUi.FindWindowInProcess(automation, process.Id, AvailableTitle, DialogTimeout);
+            int offers = HubUi.CountWindowsInProcess(automation, process.Id, AvailableTitle);
+            E2EResults.Record(
+                "hub.modal.result.offerAfterClose",
+                available is not null && offers == 1,
+                $"Update Available windows after Update Not Installed closed={offers}; exactly one must appear.");
+            E2EResults.Record(
+                "hub.modal.result.ownerDisabled",
+                mainHwnd != IntPtr.Zero && !Bwc.E2E.Harness.Win32.IsWindowEnabled(mainHwnd),
+                "The Hub remains disabled while the queued update offer is open.");
+
+            AutomationElement? later = available is null ? null : HubUi.WaitWithin(available, "UpdateLater", DialogTimeout);
+            if (later is not null)
+            {
+                HubUi.InvokeButton(later);
+            }
+
+            E2EResults.Record(
+                "hub.modal.result.ownerRestored",
+                mainHwnd != IntPtr.Zero && ControlTestSupport.WaitUntil(() => Bwc.E2E.Harness.Win32.IsWindowEnabled(mainHwnd), DialogTimeout),
+                "The Hub owner is restored after the queued offer closes.");
+        }
+        finally
+        {
+            server.ReleaseManifest();
+            InstallEvidence.StopProcess(process);
+        }
+
+        AssertNoFailures("Hub update-result modal serialization checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_CloseCancelsStartupCheck()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        DateTime testStartUtc = DateTime.UtcNow;
+
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+        server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+        server.HoldManifest();
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, CloseCheckScope, null, server, fixture, startupCheckOn: true));
+        E2EResults.CurrentSession = hub;
+
+        bool requested = server.WaitForManifestRequests(1, DialogTimeout);
+        E2EResults.Record(
+            "hub.close.check.active",
+            requested,
+            requested ? "The startup helper reached the held manifest before close." : "No active startup request was observed.");
+
+        hub.Close();
+        E2EResults.Record(
+            "hub.close.check.windowExited",
+            WaitForProcessExit(hub.ProcessId, DialogTimeout),
+            "The Hub process exited after close.");
+        E2EResults.Record(
+            "hub.close.check.helperStopped",
+            WaitForNoHelper(testStartUtc, DialogTimeout),
+            "No update helper from the active startup check remained after Hub close.");
+
+        server.ReleaseManifest();
+        AssertNoFailures("Hub close startup-check cancellation checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    [TestCategory("E2EOnly")]
+    public void Hub_CloseCancelsDownloadWork()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        EnsureExecutables(config);
+        DateTime testStartUtc = DateTime.UtcNow;
+        string dataRoot = config.DataRootFor(CloseDownloadScope);
+
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+        server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, CloseDownloadScope, null, server, fixture));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        RunCheck(hub, automation);
+        AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
+        AutomationElement? install = available is null ? null : HubUi.WaitWithin(available, "UpdateInstall", DialogTimeout);
+        bool availableReady = available is not null && install is not null;
+        E2EResults.Record(
+            "hub.close.download.offer",
+            availableReady,
+            availableReady ? "A signed update offer appeared before download." : "The signed update offer did not appear.");
+        if (!availableReady)
+        {
+            hub.Close();
+            AssertNoFailures("Hub close download cancellation checks");
+            return;
+        }
+
+        server.HoldManifest();
+        bool installedClicked = HubUi.ClickDialogButton(install!, available!);
+        E2EResults.Record(
+            "hub.close.download.installClicked",
+            installedClicked,
+            installedClicked ? "Download and Install was pressed." : "The install action could not be pressed.");
+        bool downloadRequested = server.WaitForManifestRequests(2, DialogTimeout);
+        AutomationElement? progress = HubUi.FindWindowWithChild(automation, hub.ProcessId, CheckTitle, "UpdateProgressText", DialogTimeout);
+        E2EResults.Record(
+            "hub.close.download.active",
+            downloadRequested && progress is not null,
+            $"download manifest requested={downloadRequested}, progress window={progress is not null}.");
+
+        using Process hubProcess = Process.GetProcessById(hub.ProcessId);
+        bool closePosted = PostMessageW(hub.MainHwnd, WindowCloseMessage, IntPtr.Zero, IntPtr.Zero);
+        E2EResults.Record(
+            "hub.close.download.closePosted",
+            closePosted,
+            closePosted ? "A close request was posted to the Hub owner during download." : "The Hub owner rejected the close request.");
+        bool exited = hubProcess.WaitForExit((int)DialogTimeout.TotalMilliseconds);
+        E2EResults.Record(
+            "hub.close.download.windowExited",
+            exited,
+            exited ? "The Hub exited while download progress was open." : "The Hub stayed open while download progress was open.");
+        E2EResults.Record(
+            "hub.close.download.helperStopped",
+            WaitForNoHelper(testStartUtc, DialogTimeout),
+            "No download helper remained after Hub close.");
+        E2EResults.Record(
+            "hub.close.download.noLateOffer",
+            HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, TimeSpan.FromSeconds(1)) is null,
+            "No late update offer appeared after the Hub closed.");
+
+        server.ReleaseManifest();
+        AssertNoFailures("Hub close download cancellation checks");
+    }
+
     /// <summary>
     /// The helper relaunched the Hub with --update-result InstallerFailed. The Hub must say the update did not install,
     /// that the current version is still in place, and must not show the failure name.
@@ -560,6 +882,133 @@ public sealed class HubTests
         {
             InstallEvidence.StopProcess(hubProcess);
         }
+    }
+
+    private static void CheckStartupOfferWaitsForDialog(
+        E2EConfig config,
+        string scope,
+        string menuItemId,
+        string dialogTitle,
+        string closeButtonId,
+        string checkPrefix)
+    {
+        string installed = ReadSemVer(config);
+        string dataRoot = config.DataRootFor(scope);
+        using var server = new UpdateFixtureServer();
+        using var fixture = UpdateFixture.Create(config);
+        (byte[] manifest, byte[] signature) = fixture.BuildManifest(UpdateFixture.NewerVersion, server.BaseUrl);
+        server.Offer(manifest, signature, fixture.InstallerFor(UpdateFixture.ArchX64), fixture.InstallerFor(UpdateFixture.ArchArm64));
+        server.HoldManifest();
+
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, scope, null, server, fixture, startupCheckOn: true));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        HubUi.OpenHelpMenuByMouse(hub, automation);
+        AutomationElement? menuItem = HubUi.FindInProcess(automation, hub.ProcessId, menuItemId, ElementTimeout);
+        HubUi.ClickMenuItem(menuItem);
+        AutomationElement? existing = HubUi.FindWindowInProcess(automation, hub.ProcessId, dialogTitle, DialogTimeout);
+        bool requestStarted = server.WaitForManifestRequests(1, DialogTimeout);
+        E2EResults.Record(
+            checkPrefix + ".existing",
+            existing is not null && requestStarted,
+            $"Existing modal={existing is not null}, startup manifest requested={requestStarted}.");
+
+        server.ReleaseManifest();
+        bool offerCompleted = WaitForHubLog(dataRoot, "Update check finished: Available.", DialogTimeout);
+        E2EResults.Record(
+            checkPrefix + ".completed",
+            offerCompleted,
+            offerCompleted ? "The startup check found an update while the existing modal was open." : "The startup check did not finish with an offer.");
+
+        AutomationElement? premature = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, NoDialogWindow);
+        E2EResults.Record(
+            checkPrefix + ".queued",
+            premature is null && !hub.IsEnabled,
+            premature is null
+                ? "The offer stayed queued and the Hub stayed disabled under the existing modal."
+                : "Update Available appeared over the existing modal.");
+
+        AutomationElement? close = existing is null ? null : HubUi.WaitWithin(existing, closeButtonId, DialogTimeout);
+        if (close is not null)
+        {
+            HubUi.InvokeButton(close);
+        }
+
+        AutomationElement? available = HubUi.FindWindowInProcess(automation, hub.ProcessId, AvailableTitle, DialogTimeout);
+        int offerCount = HubUi.CountWindowsInProcess(automation, hub.ProcessId, AvailableTitle);
+        E2EResults.Record(
+            checkPrefix + ".singleOffer",
+            available is not null && offerCount == 1,
+            $"After the existing modal closed, Update Available windows={offerCount}; exactly one must appear.");
+        E2EResults.Record(
+            checkPrefix + ".ownerDisabled",
+            !hub.IsEnabled,
+            "The Hub owner remains disabled while the queued offer is open.");
+
+        E2EResults.Record(
+            checkPrefix + ".version",
+            available is not null && HubUi.TextOf(HubUi.WaitWithin(available, "UpdateAvailableText", DialogTimeout) ?? available)
+                .Contains(installed, StringComparison.Ordinal),
+            $"The queued offer names installed version {installed}.");
+
+        AutomationElement? later = available is null ? null : HubUi.WaitWithin(available, "UpdateLater", DialogTimeout);
+        if (later is not null)
+        {
+            HubUi.InvokeButton(later);
+        }
+
+        E2EResults.Record(
+            checkPrefix + ".ownerRestored",
+            ControlTestSupport.WaitUntil(() => hub.IsEnabled, DialogTimeout),
+            "The Hub owner is restored after the offer closes.");
+
+        hub.Close();
+    }
+
+    private static bool WaitForProcessExit(int processId, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            try
+            {
+                using Process process = Process.GetProcessById(processId);
+                if (process.HasExited)
+                {
+                    return true;
+                }
+            }
+            catch (ArgumentException)
+            {
+                return true;
+            }
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return false;
+    }
+
+    private static bool WaitForNoHelper(DateTime startedUtc, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            if (!AnyHelperStartedSince(startedUtc, Process.GetProcessesByName(UpdateProcessName)))
+            {
+                return true;
+            }
+
+            Thread.Sleep(100);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return false;
     }
 
     /// <summary>
@@ -1951,6 +2400,10 @@ public sealed class HubTests
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessageW(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, UIntPtr extraInfo);

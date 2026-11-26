@@ -50,9 +50,8 @@ public sealed partial class MainWindow : Window
     private bool _startupCheckQueued;
     private WindowBounds? _normalBounds;
 
-    /// <summary>The check that is running now, if any, with its cancel source. Null when no check runs.</summary>
+    /// <summary>The check that is running now, if any. Null when no check runs.</summary>
     private Task<UpdateCheckResult>? _activeCheck;
-    private CancellationTokenSource? _activeCancel;
 
     /// <summary>Set when a manual check waits on the running check, which then leaves its result to that wait.</summary>
     private bool _activeCheckHandedOver;
@@ -493,6 +492,7 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        MarkClosedAndCancelUpdateWork();
         CrashHandler.SetOwnerWindow(0);
         BwcTheme.Changed -= OnThemeChanged;
         _menuKeyboard?.Dispose();

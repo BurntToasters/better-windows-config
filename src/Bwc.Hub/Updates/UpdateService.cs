@@ -430,6 +430,7 @@ internal sealed class UpdateService
 
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
         limit.CancelAfter(timeout);
+        using CancellationTokenRegistration killOnCancel = limit.Token.Register(() => KillTree(process));
         try
         {
             await process.WaitForExitAsync(limit.Token);

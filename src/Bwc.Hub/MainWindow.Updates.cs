@@ -23,6 +23,11 @@ public sealed partial class MainWindow
 
     private async Task ShowAboutAsync()
     {
+        if (IsClosed)
+        {
+            return;
+        }
+
         string noticesPath = Path.Combine(AppContext.BaseDirectory, NoticesFileName);
         bool noticesPresent = File.Exists(noticesPath);
         string text = HubStrings.Format(
@@ -32,9 +37,13 @@ public sealed partial class MainWindow
             HubStrings.Get("ProductCopyright"),
             HubStrings.Get(noticesPresent ? "AboutNoticesPresent" : "AboutNoticesAbsent"));
 
-        var dialog = new AboutDialog(text, noticesPresent);
-        _ = await dialog.ShowAsync(_hwnd);
-        if (dialog.NoticesRequested)
+        AboutDialog? dialog = null;
+        _ = await ShowHubDialogAsync(() =>
+        {
+            dialog = new AboutDialog(text, noticesPresent);
+            return dialog.ShowAsync(_hwnd);
+        });
+        if (!IsClosed && dialog?.NoticesRequested == true)
         {
             OpenFile(noticesPath);
         }
@@ -42,9 +51,18 @@ public sealed partial class MainWindow
 
     private async Task ShowUpdateSettingsAsync()
     {
-        var dialog = new UpdateSettingsDialog(UpdateSources.Channel(_settings), _settings.CheckForUpdatesOnStartup);
-        bool saved = await dialog.ShowAsync(_hwnd);
-        if (!saved)
+        if (IsClosed)
+        {
+            return;
+        }
+
+        UpdateSettingsDialog? dialog = null;
+        bool saved = await ShowHubDialogAsync(() =>
+        {
+            dialog = new UpdateSettingsDialog(UpdateSources.Channel(_settings), _settings.CheckForUpdatesOnStartup);
+            return dialog.ShowAsync(_hwnd);
+        });
+        if (IsClosed || !saved || dialog is null)
         {
             return;
         }
@@ -72,6 +90,11 @@ public sealed partial class MainWindow
     /// </summary>
     private async Task CheckForUpdatesAsync(bool interactive)
     {
+        if (IsClosed)
+        {
+            return;
+        }
+
         if (_activeCheck is not null)
         {
             if (!interactive)
@@ -82,10 +105,27 @@ public sealed partial class MainWindow
 
             // The running check leaves its result to this wait, so the user sees one result window.
             Task<UpdateCheckResult> running = _activeCheck;
-            CancellationTokenSource runningCancel = _activeCancel!;
+            UpdateWork? runningWork = _activeCheckWork;
+            if (runningWork is null)
+            {
+                return;
+            }
+
+            runningWork.Retain();
             _activeCheckHandedOver = true;
-            UpdateCheckResult shared = await WaitWithProgressAsync(running, runningCancel, UpdateSources.Channel(_settings));
-            await HandleCheckResultAsync(shared, interactive: true);
+            try
+            {
+                UpdateCheckResult shared = await WaitWithProgressAsync(running, runningWork, UpdateSources.Channel(_settings));
+                if (!IsClosed)
+                {
+                    await HandleCheckResultAsync(shared, interactive: true);
+                }
+            }
+            finally
+            {
+                runningWork.Release();
+            }
+
             return;
         }
 
@@ -93,38 +133,59 @@ public sealed partial class MainWindow
         string? manifestUrl = UpdateSources.ManifestUrl(_settings, channel);
         string currentVersion = _version.SemVer;
 
-        // Not disposed: a waiter that arrives late may still cancel it. A cancel source is a small object.
-        var cancel = new CancellationTokenSource();
-        Task<UpdateCheckResult> work = _updates.CheckAsync(manifestUrl, channel, currentVersion, cancel.Token);
-        _activeCheck = work;
-        _activeCancel = cancel;
+        var updateWork = new UpdateWork();
+        _activeCheckWork = updateWork;
+        _activeCheck = null;
         _activeCheckHandedOver = false;
-
-        UpdateCheckResult result;
-        bool handedOver;
         try
         {
-            result = interactive && !string.IsNullOrWhiteSpace(manifestUrl)
-                ? await WaitWithProgressAsync(work, cancel, channel)
-                : await work;
-        }
-        finally
-        {
-            handedOver = _activeCheckHandedOver;
-            _activeCheck = null;
-            _activeCancel = null;
-            _activeCheckHandedOver = false;
-        }
+            Task<UpdateCheckResult> work = _updates.CheckAsync(manifestUrl, channel, currentVersion, updateWork.Token);
+            _activeCheck = work;
 
-        if (!handedOver)
-        {
-            // A check that finished just as Cancel was pressed still counts as canceled.
-            if (cancel.IsCancellationRequested)
+            UpdateCheckResult result;
+            bool handedOver;
+            try
+            {
+                result = interactive && !string.IsNullOrWhiteSpace(manifestUrl)
+                    ? await WaitWithProgressAsync(work, updateWork, channel)
+                    : await work;
+            }
+            catch (OperationCanceledException)
             {
                 result = new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty);
             }
+            finally
+            {
+                handedOver = _activeCheckHandedOver;
+                if (ReferenceEquals(_activeCheckWork, updateWork))
+                {
+                    _activeCheck = null;
+                    _activeCheckWork = null;
+                    _activeCheckHandedOver = false;
+                }
+            }
 
-            await HandleCheckResultAsync(result, interactive);
+            if (!handedOver && !IsClosed)
+            {
+                // A check that finished just as Cancel was pressed still counts as canceled.
+                if (updateWork.IsCancellationRequested)
+                {
+                    result = new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty);
+                }
+
+                await HandleCheckResultAsync(result, interactive);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeCheckWork, updateWork))
+            {
+                _activeCheck = null;
+                _activeCheckWork = null;
+                _activeCheckHandedOver = false;
+            }
+
+            updateWork.Release();
         }
     }
 
@@ -132,11 +193,30 @@ public sealed partial class MainWindow
     /// Shows the progress window while the check runs. The window closes when the check finishes.
     /// If the user presses Cancel first, the check is canceled and the helper process is stopped.
     /// </summary>
-    private async Task<UpdateCheckResult> WaitWithProgressAsync(Task<UpdateCheckResult> work, CancellationTokenSource cancel, string channel)
+    private async Task<UpdateCheckResult> WaitWithProgressAsync(Task<UpdateCheckResult> work, UpdateWork updateWork, string channel)
     {
+        using ModalReservation? reservation = await ReserveModalAsync();
+        if (reservation is null)
+        {
+            updateWork.Cancel();
+            try
+            {
+                _ = await work;
+            }
+            catch (OperationCanceledException)
+            {
+                // Closing the Hub cancels this helper; keep the source alive until it has stopped.
+            }
+
+            return new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty);
+        }
+
         var progress = new UpdateProgressDialog(HubStrings.Format("UpdateChecking", channel));
         Task<bool> closed = progress.ShowAsync(_hwnd);
-        StatusText.Text = HubStrings.Format("UpdateChecking", channel);
+        if (!IsClosed)
+        {
+            StatusText.Text = HubStrings.Format("UpdateChecking", channel);
+        }
 
         work.ContinueWith(
             _ => DispatcherQueue.TryEnqueue(progress.FinishFromWorker),
@@ -147,8 +227,11 @@ public sealed partial class MainWindow
         {
             // The status shows "canceled" now. The helper is stopped below, which can take seconds, and its late
             // result is then ignored (CheckForUpdatesAsync maps a canceled check to Canceled).
-            cancel.Cancel();
-            StatusText.Text = HubStrings.Get("UpdateCanceled");
+            updateWork.Cancel();
+            if (!IsClosed)
+            {
+                StatusText.Text = HubStrings.Get("UpdateCanceled");
+            }
         }
 
         try
@@ -167,6 +250,11 @@ public sealed partial class MainWindow
     /// </summary>
     private async Task HandleCheckResultAsync(UpdateCheckResult result, bool interactive)
     {
+        if (IsClosed)
+        {
+            return;
+        }
+
         Log.Info("Update check finished: " + result.Kind + ".");
         if (result.Code is not null)
         {
@@ -216,9 +304,9 @@ public sealed partial class MainWindow
             case UpdateOutcomeKind.Available:
                 string version = result.Version ?? string.Empty;
                 StatusText.Text = HubStrings.Format("UpdateStatusAvailable", version);
-                var dialog = new UpdateAvailableDialog(_version.SemVer, version, result.NotesUrl);
-                bool install = await dialog.ShowAsync(_hwnd);
-                if (install)
+                bool install = await ShowHubDialogAsync(
+                    () => new UpdateAvailableDialog(_version.SemVer, version, result.NotesUrl).ShowAsync(_hwnd));
+                if (install && !IsClosed)
                 {
                     await InstallAsync(version);
                 }
@@ -234,6 +322,11 @@ public sealed partial class MainWindow
     /// </summary>
     private async Task InstallAsync(string offeredVersion)
     {
+        if (IsClosed)
+        {
+            return;
+        }
+
         string installDir = InstallDirectory;
         IReadOnlyList<string> running = UpdateService.ToolsRunningFrom(installDir);
         if (running.Count > 0)
@@ -254,7 +347,7 @@ public sealed partial class MainWindow
         }
 
         StagedUpdate? staged = await DownloadWithProgressAsync(manifestUrl, channel, _version.SemVer);
-        if (staged is null)
+        if (IsClosed || staged is null)
         {
             return;
         }
@@ -293,43 +386,81 @@ public sealed partial class MainWindow
     /// </summary>
     private async Task<StagedUpdate?> DownloadWithProgressAsync(string manifestUrl, string channel, string currentVersion)
     {
-        using var cancel = new CancellationTokenSource();
-        var dialog = new UpdateProgressDialog(HubStrings.Get("UpdateDownloading"));
-        Task<bool> closed = dialog.ShowAsync(_hwnd);
-        StatusText.Text = HubStrings.Get("UpdateDownloading");
-
-        // Progress<T> reports on the UI thread, so the window text and the status line change together.
-        var progress = new Progress<DownloadProgressReport>(report =>
+        if (IsClosed)
         {
-            if (report.Total > 0)
+            return null;
+        }
+
+        var updateWork = new UpdateWork();
+        _activeDownloadWork = updateWork;
+        (UpdateCheckResult Result, StagedUpdate? Staged) outcome;
+        try
+        {
+            using ModalReservation? reservation = await ReserveModalAsync();
+            if (reservation is null)
             {
+                return null;
+            }
+
+            var dialog = new UpdateProgressDialog(HubStrings.Get("UpdateDownloading"));
+            Task<bool> closed = dialog.ShowAsync(_hwnd);
+            if (!IsClosed)
+            {
+                StatusText.Text = HubStrings.Get("UpdateDownloading");
+            }
+
+            // Progress<T> reports on the UI thread, so the window text and the status line change together.
+            var progress = new Progress<DownloadProgressReport>(report =>
+            {
+                if (IsClosed || report.Total <= 0)
+                {
+                    return;
+                }
+
                 int percent = (int)Math.Min(100, report.Received * 100 / report.Total);
                 string text = HubStrings.Format("UpdateDownloadProgress", percent.ToString(CultureInfo.InvariantCulture));
                 dialog.SetProgress(text);
                 StatusText.Text = text;
+            });
+
+            Task<(UpdateCheckResult Result, StagedUpdate? Staged)> work =
+                _updates.DownloadAsync(manifestUrl, channel, currentVersion, progress, updateWork.Token);
+            work.ContinueWith(
+                _ => DispatcherQueue.TryEnqueue(dialog.FinishFromWorker),
+                TaskScheduler.Default).Forget("Hub update dialog close");
+
+            _ = await closed;
+            if (!dialog.Finished)
+            {
+                updateWork.Cancel();
+                if (!IsClosed)
+                {
+                    StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
+                }
             }
-        });
 
-        Task<(UpdateCheckResult Result, StagedUpdate? Staged)> work = _updates.DownloadAsync(manifestUrl, channel, currentVersion, progress, cancel.Token);
-        work.ContinueWith(
-            _ => DispatcherQueue.TryEnqueue(dialog.FinishFromWorker),
-            TaskScheduler.Default).Forget("Hub update dialog close");
-
-        _ = await closed;
-        if (!dialog.Finished)
+            try
+            {
+                outcome = await work;
+            }
+            catch (OperationCanceledException)
+            {
+                outcome = (new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty), null);
+            }
+        }
+        finally
         {
-            cancel.Cancel();
-            StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
+            if (ReferenceEquals(_activeDownloadWork, updateWork))
+            {
+                _activeDownloadWork = null;
+            }
+
+            updateWork.Release();
         }
 
-        (UpdateCheckResult Result, StagedUpdate? Staged) outcome;
-        try
+        if (IsClosed)
         {
-            outcome = await work;
-        }
-        catch (OperationCanceledException)
-        {
-            outcome = (new UpdateCheckResult(UpdateOutcomeKind.Canceled, string.Empty), null);
+            return null;
         }
 
         switch (outcome.Result.Kind)
@@ -338,7 +469,11 @@ public sealed partial class MainWindow
                 return outcome.Staged;
 
             case UpdateOutcomeKind.Canceled:
-                StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
+                if (!IsClosed)
+                {
+                    StatusText.Text = HubStrings.Get("UpdateDownloadCanceled");
+                }
+
                 return null;
 
             default:
@@ -363,6 +498,11 @@ public sealed partial class MainWindow
     /// </summary>
     internal async Task ShowUpdateResultAsync(string code)
     {
+        if (IsClosed)
+        {
+            return;
+        }
+
         Log.Info("Hub started after an update did not install. Code " + code + ".");
         string version = _version.SemVer;
         string text = code switch
@@ -378,19 +518,35 @@ public sealed partial class MainWindow
             _ => HubStrings.Format("UpdateResultNotInstalled", version),
         };
 
+        using ModalReservation? reservation = await ReserveModalAsync();
+        if (reservation is null)
+        {
+            return;
+        }
+
         StatusText.Text = HubStrings.Get("UpdateStatusNotInstalled");
-        await ShowMessageAsync(HubStrings.Get("UpdateNotInstalledTitle"), text, ClassicMessageIcon.Warning);
+        var box = new ClassicMessageBox(
+            HubStrings.Get("UpdateNotInstalledTitle"),
+            text,
+            ClassicMessageIcon.Warning,
+            ClassicMessageButtons.Ok,
+            primaryText: HubStrings.Get("AboutOkButton"));
+        _ = await box.ShowAsync(_hwnd);
     }
 
     private async Task ShowMessageAsync(string caption, string text, ClassicMessageIcon icon)
     {
-        var box = new ClassicMessageBox(
+        if (IsClosed)
+        {
+            return;
+        }
+
+        _ = await ShowHubDialogAsync(() => new ClassicMessageBox(
             caption,
             text,
             icon,
             ClassicMessageButtons.Ok,
-            primaryText: HubStrings.Get("AboutOkButton"));
-        _ = await box.ShowAsync(_hwnd);
+            primaryText: HubStrings.Get("AboutOkButton")).ShowAsync(_hwnd));
     }
 
     private static void OpenFile(string path)
