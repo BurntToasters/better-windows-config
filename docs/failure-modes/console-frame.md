@@ -59,8 +59,8 @@ the user's word before it counts as settled (the plan rule: a difference from cl
 - **Export List exports the list as shown now:** every row (a selection does not narrow it), in the sort order shown, the
   filtered rows while Filter On is on, and only the displayed columns in display order. The first line holds the displayed
   column headers. Every line, the last too, ends with CR LF. Tab types join cells with a tab; a tab, CR or LF inside a cell
-  becomes one space. Comma types join cells with a comma; a cell that holds a comma or a double quote is wrapped in double
-  quotes with each quote doubled. ANSI types write the system ANSI code page; Unicode types write UTF-16LE with a byte
+  becomes one space. Comma types join cells with a comma; a cell containing a comma, double quote, CR or LF is wrapped in
+  double quotes with each quote doubled. ANSI types write the system ANSI code page; Unicode types write UTF-16LE with a byte
   order mark. A list with no rows exports its header line alone. The first type (ANSI tab) is the default.
 - **Command ids.** Add/Remove Columns 1000 and Customize View 13231 in the View popup; Export List 13436 in the Action popup
   (the string id that names the help line, as Options 13220 and Customize View 13231 already follow). The old ids 1001 to
@@ -252,20 +252,23 @@ The format is in the decisions above. No capture holds an exported file.
 - The rows are in the caller's order and not the order shown, or only the selected rows are written, or the filtered-out rows
   are written.
 - A line ends with LF alone, or the last line has no line end.
-- A comma type writes a name that holds a comma without quotes (the Shared keys node: every name has one), or doubles no quote.
+- A comma type writes a cell containing a comma, quote, CR or LF without CSV quoting, doubles no quote, or splits a line break
+  inside one cell into extra records.
 - A tab type quotes, or leaves a tab or line break inside a cell.
 - A Unicode type has no byte order mark, writes UTF-8, or damages the accented and CJK names; an ANSI type writes UTF-16.
 - A list with no rows writes nothing, or fails.
 - The export changes the list, the selection, the sort, a policy file or the settings.
 
-Checks: `Console_Export_File_Ansi` (`tab.fixture`, `comma.fixture`, `listUntouched`), `Console_Export_File_Unicode` (`tab.bom`,
+Checks: `Console_Export_File_Ansi` (`tab.fixture`, `comma.fixture`, `listUntouched`),
+`Console_Export_CommaCellQuotesLineBreaks` (a two-line cell quoted inside one CSV record), `Console_Export_File_Unicode` (`tab.bom`,
 `tab.fixture`, `comma.fixture`), `Console_Export_File_FollowsTheView` (`sorted`, `columns.applied`, `selected`, `fixture`,
 `selectionKept`), `Console_Export_File_EmptyList` (`button.enabled`, `fixture`), `Console_Export_Editor_SharedKeys`
 (`rows`, `tab.fixture`, `comma.fixture`, `policyFilesUntouched`, `listUntouched`), `Console_Export_Editor_FilteredList`
 (`filter.on`, `filter.rows`, `fixture`, `filterStaysOn`). Each compares the file with a fixture of
 `tests/Bwc.E2E/Console/ExportFixtures` byte for byte; the notes name the first differing byte and the two sizes, never the
-text. Not covered: a cell with a tab or a line break (no seam writes one; the rule is in the decisions), and a long text
-(the E2E long-comment seam is 5,000 letters and would need its own fixture).
+text. `Console_Export_CommaCellQuotesLineBreaks` uses the E2E multiline-comment seam and compares the exported file byte for
+byte; a tab inside a cell and a long text (the E2E long-comment seam is 5,000 letters and would need its own fixture) remain
+open.
 
 ## 13. A write failure is not reported (mmcbase.dll 13344 to 13346)
 

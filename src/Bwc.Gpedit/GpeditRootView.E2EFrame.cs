@@ -189,8 +189,9 @@ public sealed partial class GpeditRootView
     /// E2E only. BWC_E2E_CONSOLE_ROWS is the number of synthetic rows (default 8; a missing, malformed or negative value
     /// gives the default, more than 100,000 is limited). Row i is named "Setting NNNNN" with a number that is a
     /// permutation of the rows, has the state i % 3 and the comment i % 2, and its tag is i. BWC_E2E_CONSOLE_NAMES set
-    /// to typeahead names the first rows from a fixed set that includes non ASCII names, and BWC_E2E_CONSOLE_LONGTEXT
-    /// gives row 3 a comment of 5,000 characters. With BWC_E2E_CONSOLE_ROWS set, the toolbar Refresh replaces the rows.
+    /// to typeahead names the first rows from a fixed set that includes non ASCII names, BWC_E2E_CONSOLE_LONGTEXT gives row 3
+    /// a comment of 5,000 characters, and BWC_E2E_CONSOLE_MULTILINE gives it a two-line comment. With BWC_E2E_CONSOLE_ROWS
+    /// set, the toolbar Refresh replaces the rows.
     /// </summary>
     private void SeedE2ERows()
     {
@@ -208,6 +209,7 @@ public sealed partial class GpeditRootView
     {
         bool typeAhead = string.Equals(Environment.GetEnvironmentVariable("BWC_E2E_CONSOLE_NAMES"), "typeahead", StringComparison.Ordinal);
         bool longText = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BWC_E2E_CONSOLE_LONGTEXT"));
+        bool multiline = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("BWC_E2E_CONSOLE_MULTILINE"));
         var rows = new List<ConsoleListRow>(count);
         for (int i = 0; i < count; i++)
         {
@@ -215,7 +217,9 @@ public sealed partial class GpeditRootView
             string name = typeAhead && i < E2ETypeAheadNames.Length
                 ? E2ETypeAheadNames[i]
                 : (generation > 0 ? "Refreshed " : "Setting ") + key.ToString("D5", CultureInfo.InvariantCulture);
-            string comment = longText && i == 3 ? new string('W', 5000) : (i % 2 == 0 ? "No" : "Yes");
+            string comment = multiline && i == 3
+                ? "first line\r\nsecond line"
+                : longText && i == 3 ? new string('W', 5000) : (i % 2 == 0 ? "No" : "Yes");
 
             // Every fourth row names a module icon that does not exist, to exercise the fallback glyph.
             IconReference icon = i % 4 == 3 ? ModuleIcon.ById("bwc-e2e-missing-module.dll", 1) : IconKind.StringValue;

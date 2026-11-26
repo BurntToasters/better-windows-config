@@ -121,9 +121,7 @@ internal sealed class NumberField : OptionField
         _label = MakeLabel();
         if (control.Spin != false)
         {
-            long spinMax = (long)Math.Min(_max, long.MaxValue);
-            long spinMin = (long)Math.Min(_min, (ulong)spinMax);
-            long step = (long)Math.Clamp(control.SpinStep ?? 1UL, 1UL, long.MaxValue);
+            ulong step = Math.Max(control.SpinStep ?? 1UL, 1UL);
             ClassicControlDefinition definition = new(
                 ClassicControlKind.Spinner,
                 0,
@@ -134,9 +132,9 @@ internal sealed class NumberField : OptionField
                 OptionsMetrics.Dlu(OptionsMetrics.SpinWidth),
                 OptionsMetrics.Dlu(OptionsMetrics.EditHeight))
             {
-                Minimum = spinMin,
-                Maximum = spinMax,
-                Step = step,
+                UnsignedMinimum = _min,
+                UnsignedMaximum = _max,
+                UnsignedStep = step,
                 LiteralText = true,
             };
             var spin = (ClassicSpinBox)Context.Create(definition);

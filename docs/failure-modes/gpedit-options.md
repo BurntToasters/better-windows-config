@@ -122,22 +122,24 @@ Enabled.
 ## 5. Number boxes
 
 Failure mode: the spin step is 1 where `spinStep` says 5, Up passes the maximum or Down passes the minimum, the step is a
-multiple of the step instead of a step from the current value, the box has spin buttons when `spin` is false, a long decimal
-above 2^63 breaks the control, a letter can be typed, a number above the range is accepted, soft ranges are treated as soft,
-the number is shown with a thousands separator, or a typed or pasted 20-digit number above `ulong.MaxValue` stays visible
-while `Entered` silently falls back to `_last` and saves a previous number. An overstrict guard can also reject `ulong.MaxValue` or
-reject an empty intermediate value instead of allowing blank editing.
+multiple of the step instead of a step from the current value, the box has spin buttons when `spin` is false, or a signed
+spinner's existing range or automation behavior changes. A spin-enabled long decimal above `long.MaxValue` can also be accepted
+as text and then replaced by an unrelated prior signed value when Up or Down is pressed; a bound or step above `long.MaxValue`
+can be clipped before the spinner sees it. Other failures include a letter typed, a number above the declared range accepted,
+soft ranges treated as soft, a thousands separator shown, or a typed or pasted number above `ulong.MaxValue` silently read as
+`_last`. An overstrict guard can reject `ulong.MaxValue` or a blank intermediate edit.
 
-- Handling: a decimal or long decimal box whose control says `spin` is not false is a `ClassicSpinBox` (minimum from the
-  element or 0; maximum from the element or 2^32 - 1, at most 2^63 - 1; step `spinStep` or 1). Otherwise it is a plain text box
-  with the same digit filter. Proposed text is at most 20 ASCII digits; nonempty text must parse as an invariant `ulong`, while
-  blank text remains allowed during editing and retains the last valid number. Thus `ulong.MaxValue` is accepted and a larger value
-  cannot reach `Entered`. The text is the plain invariant number. `soft` does not change the range (the engine ignores it,
-  `PolicyRules.SoftIgnoredByValidation`).
-- E2E: `Gpedit_Options_Numbers` on `Pol_Decimal_MinMax` (10 to 500, step 5): Up gives 30 from 25, Down twice gives 20, Down from
-  10 stays 10 and Up at 498 stops at 500; on `Pol_LongDecimal_Basic` Up adds 1000; `Pol_Decimal_Required` (`spin="false"`) has
-  no spin buttons; letters typed are ignored. On `Pol_LongDecimal_RequiredSoftText`, `ulong.MaxValue` is visible and read back,
-  blank editing keeps that last valid number, and typed overflow is refused before the UI and readout can diverge.
+- Handling: a decimal or long decimal box whose control says `spin` is not false is a `ClassicSpinBox`; it keeps the complete
+  unsigned element bounds and `spinStep` for numeric policy controls. Decimal defaults to 0..2^32-1 and long decimal to
+  0..`ulong.MaxValue`; an explicit element range narrows those bounds. Stepping uses a wide intermediate and clamps to that full
+  range. Other classic spinner callers retain their signed `long` range and automation behavior. Without spin buttons the field is
+  a plain text box with the same digit filter. Proposed text is at most 20 ASCII digits; nonempty text must parse as an invariant
+  `ulong`, while blank text remains allowed during editing and retains the last valid number. The text is the plain invariant
+  number. `soft` does not change the range (the engine ignores it, `PolicyRules.SoftIgnoredByValidation`).
+- E2E: `Gpedit_Options_Numbers` checks range and step boundaries; `Gpedit_Options_UnsignedLongDecimalSpinner` checks the
+  real policy field above `long.MaxValue`, at `ulong.MaxValue`, and with a full-width step. `Additions_UnsignedSpinnerFullRange`
+  checks unsigned bounds and clamping, while `Additions_SpinnerRangeKeysAndText` keeps covering signed keys, buttons and
+  automation. `Pol_Decimal_Required` (`spin="false"`) has no spin buttons; letters typed are ignored.
 
 ## 6. Text, combo box and multi-line boxes
 
@@ -180,20 +182,22 @@ parsed for an access key, a long label is clipped.
 Failure mode: the "Show..." button is missing or does nothing, it opens an empty grid for a list that has entries, the plain
 list shows two columns or the explicit list shows one, the columns are swapped (value first), a new row cannot be added
 (the grid always ends with an empty row), a row cannot be edited or deleted, Cancel keeps the changes, OK drops the changes,
-an empty value or an empty name is accepted, a duplicate is accepted, a message appears without moving the focus to the row,
-an untouched trailing row swallows Enter or Escape so the dialog cannot accept or cancel, Enter after clearing a two-column
-row advances to the following row's other column, the entered order is lost, the dialog does not block the policy dialog, or
-the policy dialog is not marked changed after OK.
+a plain-list empty value or an explicit-list empty name is accepted, an explicit row with a nonempty name and empty data is
+refused, a duplicate is accepted, a message appears without moving the focus to the row, an untouched trailing row swallows
+Enter or Escape so the dialog cannot accept or cancel, Enter after clearing a two-column row advances to the following row's
+other column, the entered order is lost, the dialog does not block the policy dialog, or the policy dialog is not marked
+changed after OK.
 
 - Handling: the "Show..." button opens `ShowContentsDialog` (a classic dialog over `ClassicEditableGrid`): columns "Value" for a
-  plain list, "Value name" and "Value" for an `explicitValue` list, the rows of the current list. OK validates the rows
-  (empty name: `ListBoxDialog.Validate.EmptyName`; empty value: `EmptyValue`; the same name twice: `DuplicateName`; the same
-  value twice in a plain list: `DuplicateValue`; caption "Error in the information entered") and keeps the focus on the
+  plain list, "Value name" and "Value" for an `explicitValue` list, the rows of the current list. OK rejects an empty plain-list
+  value and an empty explicit-list name, but accepts empty data for an explicit row with a nonempty name. It still rejects the
+  same explicit name twice (`DuplicateName`) and the same value twice in a plain list (`DuplicateValue`), keeping focus on the
   offending cell. Cancel changes nothing. OK with a changed list calls `MarkOptionsDirty`. A list that is not changed is not
   marked.
-- E2E: `Gpedit_Options_List` on `Pol_List_Plain`, `Pol_List_ExplicitValue`: columns and names, add two rows by typing,
-  delete one, OK, Apply, reopen and see the rows; Cancel keeps the old list; a duplicate shows the message and the focus is
-  on the cell; an empty value shows the message; Enter on the untouched trailing row accepts a valid list and Escape cancels.
+- E2E: `Gpedit_Options_List` on `Pol_List_Plain`, `Pol_List_ExplicitValue`: columns and names, add rows by typing, delete
+  one, OK, Apply, reopen and see the rows; Cancel keeps the old list; duplicate names still show the message and focus the cell;
+  a plain empty value and an explicit empty name are refused; an explicit name-only row is accepted and shown again when Show
+  Contents reopens. Enter on the untouched trailing row accepts a valid list and Escape cancels.
 
 ## 10. Removed entries of an additive list
 

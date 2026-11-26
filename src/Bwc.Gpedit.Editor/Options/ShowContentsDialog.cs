@@ -173,8 +173,8 @@ internal sealed class ShowContentsDialog : ClassicDialog
     }
 
     /// <summary>
-    /// The first wrong row, in row order: an empty name, an empty value, a name or a value that an earlier row has. Null when
-    /// the rows are right.
+    /// The first wrong row, in row order: an empty explicit name, an empty implicit-list value, a name or a value that an
+    /// earlier row has. Empty data is valid for an explicit-list row. Null when the rows are right.
     /// </summary>
     internal static ContentsProblem? Check(IReadOnlyList<string[]> rows, bool explicitValue, StringComparer valueComparer)
     {
@@ -189,7 +189,7 @@ internal sealed class ShowContentsDialog : ClassicDialog
                 return new ContentsProblem("ContentsEmptyName", null, i, 0);
             }
 
-            if (string.IsNullOrEmpty(row[valueColumn]))
+            if (!explicitValue && string.IsNullOrEmpty(row[valueColumn]))
             {
                 return new ContentsProblem("ContentsEmptyValue", null, i, valueColumn);
             }

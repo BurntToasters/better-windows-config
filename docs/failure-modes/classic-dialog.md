@@ -866,11 +866,15 @@ literal host label is "Fish && Chips &" and the test expects exactly that text.
 ### 14.8 Spin box range and keys
 
 Failure mode: Up past the maximum wraps or overflows, Down below the minimum goes negative, a step larger than the range
-jumps outside it, or a value near the `long` limits overflows when the step is added. Guard: the new value is
-`Clamp((Int128)current + step, min, max)` where current is the parsed text clamped to the range, and the constructor
-rejects `min > max` and `step <= 0`. Up and Down on the text box change the value by one step. Page Up and Page Down are not
-handled (they do not move a Win32 up-down). Typing never clamps. E2E: `Additions_SpinnerRangeKeysAndText` runs Up and Down
-from the middle, at the maximum, at the minimum, and with a step of 5 from a value that is not a multiple of 5.
+jumps outside it, or a value near the `long` limits overflows when the step is added. An unsigned policy spinner can accept a
+value above `long.MaxValue` and then replace it with an unrelated previous signed value on Up or Down; clipping its maximum
+or step also leaves valid `ulong` values unreachable. Signed spinner callers can regress in parsing, stepping, range or
+automation behavior. Guard: signed controls keep their `long` path. Unsigned controls parse and format the full `ulong` range,
+then use an `Int128` intermediate and clamp to their unsigned minimum and maximum. Each path rejects `min > max` and
+`step == 0`. Up and Down on the text box change the value by one step. Page Up and Page Down are not handled (they do not move
+a Win32 up-down). Typing never clamps. E2E: `Additions_SpinnerRangeKeysAndText` keeps exercising signed key, button and
+automation behavior; `Additions_UnsignedSpinnerFullRange` covers `long.MaxValue + 1`, `ulong.MaxValue`, unsigned boundaries,
+and a large step.
 
 ### 14.9 Typed text the spin box refuses to hold
 
