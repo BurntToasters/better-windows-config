@@ -55,6 +55,8 @@ public sealed partial class ClassicWindowShell : UserControl
     private ClassicMenuKeyboard? _menuKeyboard;
     private nint _topHwnd;
     private bool _metricsSubscribed;
+    private XamlRoot? _observedRoot;
+    private double _observedScale;
     private bool _keyboardSplitMode;
     private bool _splitterDragging;
     private double _splitterDragStartWidth;
@@ -400,6 +402,18 @@ public sealed partial class ClassicWindowShell : UserControl
             _metricsSubscribed = true;
         }
 
+        if (XamlRoot is { } root && !ReferenceEquals(_observedRoot, root))
+        {
+            if (_observedRoot is not null)
+            {
+                _observedRoot.Changed -= OnXamlRootChanged;
+            }
+
+            _observedRoot = root;
+            _observedScale = root.RasterizationScale;
+            root.Changed += OnXamlRootChanged;
+        }
+
         BwcTheme.Changed += OnThemeChanged;
         RootGrid.RequestedTheme = BwcTheme.ElementThemeFor(BwcTheme.Current);
         ClassicMenuBrushes.Refresh();
@@ -421,6 +435,12 @@ public sealed partial class ClassicWindowShell : UserControl
         }
 
         BwcTheme.Changed -= OnThemeChanged;
+        if (_observedRoot is not null)
+        {
+            _observedRoot.Changed -= OnXamlRootChanged;
+            _observedRoot = null;
+        }
+
         DetachMenuKeyboard();
     }
 
@@ -487,14 +507,21 @@ public sealed partial class ClassicWindowShell : UserControl
         ApplyMetrics();
     }
 
+    private void OnXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        if (Math.Abs(sender.RasterizationScale - _observedScale) < 0.001)
+        {
+            return;
+        }
+
+        _observedScale = sender.RasterizationScale;
+        ApplyMenuMetrics();
+    }
+
     private void ApplyMetrics()
     {
         FontSize = DenseMetrics.FontSize;
         FontFamily = DenseMetrics.FontFamily;
-
-        MenuBarRoot.Height = DenseMetrics.MenuBarHeight;
-        MenuBarRoot.FontSize = DenseMetrics.FontSize;
-        MenuBarRoot.FontFamily = DenseMetrics.FontFamily;
 
         AddressBox.Height = DenseMetrics.AddressBarHeight;
         AddressBox.MinHeight = DenseMetrics.AddressBarHeight;
@@ -505,6 +532,18 @@ public sealed partial class ClassicWindowShell : UserControl
 
         TreeControl.ApplyMetrics();
         ListControl.ApplyMetrics();
+
+        ApplyMenuMetrics();
+
+        AddressRow.Height = IsAddressBarVisible ? GridLength.Auto : new GridLength(0);
+        SetTreeWidth(_treePaneWidth);
+    }
+
+    private void ApplyMenuMetrics()
+    {
+        MenuBarRoot.Height = DenseMetrics.MenuBarHeight;
+        MenuBarRoot.FontSize = DenseMetrics.FontSize;
+        MenuBarRoot.FontFamily = DenseMetrics.FontFamily;
 
         // Top-level widths come from the GDI label width at the window scale, so they match the oracle.
         double scale = XamlRoot?.RasterizationScale ?? 1.0;
@@ -521,9 +560,6 @@ public sealed partial class ClassicWindowShell : UserControl
         }
 
         ApplyPopupWidths(MenuBarRoot.Items.OfType<MenuBarItem>(), scale);
-
-        AddressRow.Height = IsAddressBarVisible ? GridLength.Auto : new GridLength(0);
-        SetTreeWidth(_treePaneWidth);
     }
 
     /// <summary>

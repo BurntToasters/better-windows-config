@@ -87,6 +87,7 @@ public sealed class HubTests
     private const string ToolOrderScope = "hub-tool-order";
     private const string UnconfiguredScope = "hub-unconfigured";
     private const string SettingsScope = "hub-settings";
+    private const string SettingsRollbackScope = "hub-settings-rollback";
     private const string LightScope = "hub-light";
     private const string UpdateScope = "hub-update";
     private const string DarkScope = "hub-dark";
@@ -327,6 +328,69 @@ public sealed class HubTests
 
         hub.Close();
         AssertNoFailures("Hub update settings checks");
+    }
+
+    [TestMethod]
+    [TestCategory("Hub")]
+    public void Hub_UpdateSettings_SaveFailureRestoresPreviousChoices()
+    {
+        _checkStart = E2EResults.CheckCount;
+        var config = GuiGate.Config;
+        EnsureExecutables(config);
+        string settingsPath = SettingsPath(config, SettingsRollbackScope);
+
+        using var hub = new AppSession(
+            config,
+            config.HubExePath,
+            environment: Environment(config, SettingsRollbackScope, null, settingsJson: BetaSavedJson));
+        E2EResults.CurrentSession = hub;
+        using var automation = new UIA3Automation();
+
+        // Beta is hidden in this build, so the seeded beta value resolves to stable on Save.
+        // SettingsStore replaces the file atomically; this read handle denies delete/replace sharing.
+        using (new FileStream(settingsPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            HubUi.OpenHelpMenuByMouse(hub, automation);
+            HubUi.ClickMenuItem(HubUi.FindInProcess(automation, hub.ProcessId, "MenuItem_UpdateSettings", ElementTimeout));
+            AutomationElement? settings = HubUi.FindWindowInProcess(automation, hub.ProcessId, SettingsTitle, DialogTimeout);
+            AutomationElement? startupCheck = HubUi.WaitWithin(settings, "UpdateStartupCheck", DialogTimeout);
+            bool dialogRaised = settings is not null && HubUi.RaiseDialog(
+                (IntPtr)settings.Properties.NativeWindowHandle.ValueOrDefault,
+                TimeSpan.FromSeconds(3));
+            bool startupChanged = dialogRaised && startupCheck is not null && startupCheck.AsCheckBox().IsChecked == false;
+            if (startupChanged)
+            {
+                startupCheck!.Click();
+                startupChanged = startupCheck.AsCheckBox().IsChecked == true;
+            }
+
+            E2EResults.Record("hub.settings.rollback.startupChanged", startupChanged, "The startup choice changed from off to on before Save.");
+            HubUi.InvokeButton(HubUi.WaitWithin(settings, "UpdateSettingsOk", DialogTimeout));
+            AutomationElement? error = HubUi.FindWindowWithChild(automation, hub.ProcessId, SettingsTitle, "DialogMessage", DialogTimeout);
+            string errorText = MessageText(error);
+            bool saveFailureShown = errorText.Contains("settings could not be saved", StringComparison.OrdinalIgnoreCase);
+            E2EResults.Record(
+                "hub.settings.rollback.saveFailure",
+                saveFailureShown,
+                saveFailureShown ? errorText : $"Expected the settings-save error; observed '{errorText}'.");
+            HubUi.InvokeButton(HubUi.WaitWithin(error, "DialogPrimary", DialogTimeout));
+            bool errorDismissed = error is not null && HubUi.WaitForWindowGone(automation, hub.ProcessId, SettingsTitle, DialogTimeout);
+            E2EResults.Record(
+                "hub.settings.rollback.errorDismissed",
+                errorDismissed,
+                errorDismissed ? "The settings-save error was dismissed." : "The settings-save error did not close.");
+        }
+
+        hub.Close();
+        (bool startup, int version, string channel) = ReadSettings(settingsPath) ?? (true, 0, string.Empty);
+        bool fileRestored = !startup && version == 2 && string.Equals(channel, "beta", StringComparison.Ordinal);
+        E2EResults.Note("hub.settings.rollback.file", settingsPath);
+        E2EResults.Record(
+            "hub.settings.rollback.fileRestored",
+            fileRestored,
+            $"After Hub close, scoped settings have {channel}, startup={startup}, version={version}; expected beta, false, 2.");
+
+        AssertNoFailures("Hub update settings rollback checks");
     }
 
     /// <summary>

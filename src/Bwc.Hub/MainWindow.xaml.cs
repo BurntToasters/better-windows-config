@@ -49,6 +49,8 @@ public sealed partial class MainWindow : Window
     private bool _initialSizeApplied;
     private bool _startupCheckQueued;
     private WindowBounds? _normalBounds;
+    private XamlRoot? _observedRoot;
+    private double _observedScale;
 
     /// <summary>The check that is running now, if any. Null when no check runs.</summary>
     private Task<UpdateCheckResult>? _activeCheck;
@@ -91,6 +93,7 @@ public sealed partial class MainWindow : Window
         RestoreWindowBounds();
 
         HubRoot.Loaded += OnHubRootLoaded;
+        HubRoot.Unloaded += OnHubRootUnloaded;
         AppWindow.Closing += OnAppWindowClosing;
         AppWindow.Changed += OnAppWindowChanged;
         Closed += OnClosed;
@@ -407,6 +410,14 @@ public sealed partial class MainWindow : Window
 
     private void OnHubRootLoaded(object sender, RoutedEventArgs e)
     {
+        if (HubRoot.XamlRoot is { } root && !ReferenceEquals(_observedRoot, root))
+        {
+            StopObservingHubRoot();
+            _observedRoot = root;
+            _observedScale = root.RasterizationScale;
+            root.Changed += OnHubXamlRootChanged;
+        }
+
         ApplyMenuBarMetrics();
         if (!_initialSizeApplied)
         {
@@ -427,6 +438,28 @@ public sealed partial class MainWindow : Window
         }
 
         _ = ToolList.Focus(FocusState.Programmatic);
+    }
+
+    private void OnHubRootUnloaded(object sender, RoutedEventArgs e) => StopObservingHubRoot();
+
+    private void StopObservingHubRoot()
+    {
+        if (_observedRoot is not null)
+        {
+            _observedRoot.Changed -= OnHubXamlRootChanged;
+            _observedRoot = null;
+        }
+    }
+
+    private void OnHubXamlRootChanged(XamlRoot sender, XamlRootChangedEventArgs args)
+    {
+        if (Math.Abs(sender.RasterizationScale - _observedScale) < 0.001)
+        {
+            return;
+        }
+
+        _observedScale = sender.RasterizationScale;
+        ApplyMenuBarMetrics();
     }
 
     /// <summary>
@@ -500,6 +533,8 @@ public sealed partial class MainWindow : Window
         AppWindow.Closing -= OnAppWindowClosing;
         AppWindow.Changed -= OnAppWindowChanged;
         HubRoot.Loaded -= OnHubRootLoaded;
+        HubRoot.Unloaded -= OnHubRootUnloaded;
+        StopObservingHubRoot();
     }
 
     private HubSettings LoadSettings()
