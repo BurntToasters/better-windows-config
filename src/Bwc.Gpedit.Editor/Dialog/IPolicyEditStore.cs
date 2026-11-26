@@ -7,7 +7,7 @@ namespace Bwc.Gpedit.Editor.Dialog;
 
 /// <summary>What <see cref="IPolicyEditStore.Apply"/> did.</summary>
 /// <param name="Problems">The problems found. When there are any, nothing was changed.</param>
-/// <param name="Changed">True when the state or the comment changed.</param>
+/// <param name="Changed">True when files were written, including metadata recovery after a partial save.</param>
 /// <param name="RefreshFailure">
 /// Why the policy refresh after the write failed, or null. The files are on disk and the change is applied.
 /// </param>
@@ -15,6 +15,19 @@ public sealed record PolicyApplyOutcome(IReadOnlyList<PolicyEditProblem> Problem
 {
     /// <summary>True when the edit was valid and applied.</summary>
     public bool IsApplied => Problems.Count == 0;
+}
+
+/// <summary>The dialog's dirty comparison against the disk snapshot it last read.</summary>
+internal static class PolicyEditDirtyState
+{
+    internal static bool IsDirty(
+        PolicyState selectedState,
+        string comment,
+        bool optionsDirty,
+        PolicyState baselineState,
+        string baselineComment,
+        bool recoveryPending) =>
+        recoveryPending || selectedState != baselineState || !string.Equals(comment, baselineComment, StringComparison.Ordinal) || optionsDirty;
 }
 
 /// <summary>

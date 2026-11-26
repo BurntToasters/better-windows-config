@@ -74,6 +74,17 @@ internal sealed class GoldenSandbox : IDisposable
     public void MarkReadOnly(string flatName)
     {
         string path = PathOf(flatName);
+        if (!File.Exists(path))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            byte[] initial = flatName == GpoFileNames.GptIniFile
+                ? GptIni.CreateNew().ToBytes()
+                : flatName.EndsWith("." + GpoFileNames.RegistryPol, StringComparison.Ordinal)
+                    ? [0x50, 0x52, 0x65, 0x67, 1, 0, 0, 0]
+                    : [];
+            File.WriteAllBytes(path, initial);
+        }
+
         File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
     }
 

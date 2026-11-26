@@ -362,8 +362,9 @@ public sealed class GpoSaveTests
     {
         using var fx = new SandboxGpoFixture();
         fx.Refresher.Failure = new InvalidOperationException("refresh refused");
+        var store = fx.NewStore();
 
-        var result = fx.NewStore().Save(GpoSide.Machine, SetAlpha);
+        var result = store.Save(GpoSide.Machine, SetAlpha);
 
         Assert.IsTrue(result.Wrote);
         Assert.IsFalse(result.Refreshed);
@@ -371,6 +372,15 @@ public sealed class GpoSaveTests
         Assert.AreEqual(GpoStoreFailure.RefreshFailed, result.RefreshFailure.Reason);
         Assert.IsTrue(File.Exists(fx.PolPath(GpoSide.Machine)));
         Assert.IsTrue(File.Exists(fx.GptPath));
+
+        uint version = GptIni.Parse(fx.Read(fx.GptPath)!).Version;
+        fx.Refresher.Failure = null;
+        GpoSaveResult retry = store.Save(GpoSide.Machine, _ => { });
+
+        Assert.IsFalse(retry.Wrote, "refresh recovery does not rewrite policy files");
+        Assert.IsTrue(retry.Refreshed, "the pending refresh is retried after a byte-level no-op");
+        Assert.AreEqual(version, GptIni.Parse(fx.Read(fx.GptPath)!).Version, "refresh recovery does not bump version metadata again");
+        CollectionAssert.AreEqual(new[] { GpoSide.Machine, GpoSide.Machine }, fx.Refresher.Calls);
     }
 
     [TestMethod]
@@ -387,6 +397,29 @@ public sealed class GpoSaveTests
         Assert.IsFalse(Directory.Exists(fx.GpoRoot));
         Assert.IsFalse(Directory.Exists(fx.BackupRoot));
         Assert.AreEqual(0, fx.Events.Count);
+    }
+
+    [TestMethod]
+    public void Save_AccessDecisionCanChangeOnTheCachedSession_AndBackupStillRunsOnce()
+    {
+        using var fx = new SandboxGpoFixture();
+        var store = fx.NewStore(o => o.Access = new GpoAccessResult([GpoReadOnlyReason.NoWriteAccess]));
+        System.Reflection.MethodInfo? updateAccess = typeof(GpoStore).GetMethod("UpdateAccess");
+        Assert.IsNotNull(updateAccess, "the cached session must accept the access decision from the refreshed model");
+
+        GpoStoreException denied = Assert.ThrowsExactly<GpoStoreException>(
+            () => store.Save(GpoSide.Machine, SetAlpha));
+        Assert.AreEqual(GpoStoreFailure.ReadOnlyMode, denied.Reason);
+
+        updateAccess.Invoke(store, [new GpoAccessResult([])]);
+        store.Save(GpoSide.Machine, SetAlpha);
+        Assert.AreEqual(1, fx.BackupFolders().Length);
+
+        updateAccess.Invoke(store, [new GpoAccessResult([GpoReadOnlyReason.NoWriteAccess])]);
+        Assert.ThrowsExactly<GpoStoreException>(() => store.Save(GpoSide.User, SetAlpha));
+        updateAccess.Invoke(store, [new GpoAccessResult([])]);
+        store.Save(GpoSide.User, SetAlpha);
+        Assert.AreEqual(1, fx.BackupFolders().Length, "updating access must keep the existing session backup state");
     }
 
     [TestMethod]

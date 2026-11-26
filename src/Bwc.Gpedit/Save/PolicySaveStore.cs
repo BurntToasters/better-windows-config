@@ -78,11 +78,15 @@ internal sealed class PolicySaveStore : IPolicyEditStore
             return new PolicyApplyOutcome(outcome.Problems, false);
         }
 
-        if (outcome.Result is { Wrote: true } result)
+        if (outcome.Result is { } result)
         {
-            // The files were written: the models of the dialog and of the list become what is on disk now.
-            Volatile.Write(ref _snapshot, _store.Open());
-            return new PolicyApplyOutcome([], true, result.RefreshFailure);
+            if (result.Wrote)
+            {
+                // Files were written: the models of the dialog and of the list become what is on disk now.
+                Volatile.Write(ref _snapshot, _store.Open());
+            }
+
+            return new PolicyApplyOutcome([], result.Wrote, result.RefreshFailure);
         }
 
         return new PolicyApplyOutcome([], false);

@@ -68,6 +68,133 @@ public sealed class PolicySaveStoreTests
         Assert.AreEqual("pending comment", partial.Side(GpoSide.Machine).Comments?.GetComment(policy.Namespace, policy.Name));
         Assert.AreEqual(initial.GptIni?.Version, partial.GptIni?.Version, "gpt.ini was the refused write and remains as read before it");
         Assert.AreEqual(0, sandbox.Refresher.Calls.Count);
+
+        sandbox.AllowWrite(GpoFileNames.GptIniFile);
+        PolicyApplyOutcome retry = store.Apply(target, PolicyEdit.Disabled, "pending comment");
+        GpoSnapshot recovered = store.Snapshot!;
+        Assert.IsTrue(retry.IsApplied);
+        Assert.IsTrue(retry.Changed, "recovery writes the metadata even though the edit is now a byte-level no-op");
+        Assert.AreEqual((initial.GptIni?.Version ?? 0) + 1, recovered.GptIni?.Version);
+        Assert.AreEqual(1, sandbox.Refresher.Calls.Count);
+
+        PolicyApplyOutcome repeat = store.Apply(target, PolicyEdit.Disabled, "pending comment");
+        Assert.IsFalse(repeat.Changed);
+        Assert.AreEqual(recovered.GptIni?.Version, store.Snapshot?.GptIni?.Version, "a repeated retry does not bump twice");
+        Assert.AreEqual(1, sandbox.Refresher.Calls.Count, "a completed recovery does not refresh again");
+    }
+
+    [TestMethod]
+    public void CommentOnlyPartialWrite_RetryCreatesMissingPolicyAndCompletesMetadataAndRefresh()
+    {
+        using var sandbox = new GoldenSandbox();
+        PolicyDefinition policy = Fixture.Load().Policy("Pol_Class_Machine");
+        sandbox.Seed(sandbox.GptPath, GptIni.CreateNew().ToBytes());
+        GpoSnapshot initial = sandbox.Store.Open();
+        var store = new PolicySaveStore(sandbox.Store, initial, readOnly: false);
+        var target = new PolicyRef(policy, GpoSide.Machine);
+        sandbox.FailNextWriteAfter(CommentFile, PolicyFile);
+
+        GpoStoreException failure = Assert.Throws<GpoStoreException>(
+            () => store.Apply(target, null, "comment only"));
+
+        Assert.AreEqual(GpoStoreFailure.ReadOnlyTarget, failure.Reason);
+        CollectionAssert.AreEqual(new[] { sandbox.PathOf(CommentFile) }, failure.WrittenFiles.ToArray());
+        Assert.IsTrue(store.Snapshot!.Machine.PolExists, "the fault leaves a valid read-only target where the missing Registry.pol was expected");
+        Assert.AreEqual("comment only", store.Snapshot.Machine.Comments?.GetComment(policy.Namespace, policy.Name));
+
+        sandbox.AllowWrite(PolicyFile);
+        PolicyApplyOutcome retry = store.Apply(target, null, "comment only");
+
+        Assert.IsTrue(retry.IsApplied);
+        Assert.IsTrue(retry.Changed);
+        Assert.IsTrue(store.Snapshot!.Machine.PolExists, "recovery creates the empty first-save Registry.pol");
+        Assert.AreEqual((initial.GptIni?.Version ?? 0) + 1, store.Snapshot.GptIni?.Version);
+        Assert.AreEqual(1, sandbox.Refresher.Calls.Count);
+    }
+
+    [TestMethod]
+    public void RecoveryOnOneSide_DoesNotClearTheOtherSidesPendingVersionBump()
+    {
+        using var sandbox = new GoldenSandbox();
+        PolicyDefinition policy = Fixture.Load().Policy("Pol_Class_Machine");
+        SeedEmptyPolicy(sandbox);
+        GpoSnapshot initial = sandbox.Store.Open();
+        var store = new PolicySaveStore(sandbox.Store, initial, readOnly: false);
+        var machine = new PolicyRef(policy, GpoSide.Machine);
+        var user = new PolicyRef(policy, GpoSide.User);
+        sandbox.FailNextWriteAfter(PolicyFile, GpoFileNames.GptIniFile);
+
+        _ = Assert.Throws<GpoStoreException>(() => store.Apply(machine, PolicyEdit.Disabled, "machine"));
+        sandbox.AllowWrite(GpoFileNames.GptIniFile);
+
+        PolicyApplyOutcome userSave = store.Apply(user, PolicyEdit.Disabled, "user");
+        Assert.IsTrue(userSave.Changed);
+        Assert.AreEqual(65536u, store.Snapshot!.GptIni?.Version);
+        Assert.AreEqual(1, sandbox.Refresher.Calls.Count);
+        CollectionAssert.AreEqual(new[] { GpoSide.User }, sandbox.Refresher.Calls);
+
+        PolicyApplyOutcome machineRetry = store.Apply(machine, PolicyEdit.Disabled, "machine");
+        Assert.IsTrue(machineRetry.Changed);
+        Assert.AreEqual(65537u, store.Snapshot!.GptIni?.Version);
+        CollectionAssert.AreEqual(new[] { GpoSide.User, GpoSide.Machine }, sandbox.Refresher.Calls);
+    }
+
+    [TestMethod]
+    public void RetryWithOriginalComment_StillDiffersFromThePartialDiskBaseline()
+    {
+        using var sandbox = new GoldenSandbox();
+        PolicyDefinition policy = Fixture.Load().Policy("Pol_Class_Machine");
+        SeedEmptyPolicy(sandbox);
+        var seedComments = Bwc.Gpo.Comments.CmtxDocument.CreateEmpty();
+        seedComments.SetComment(policy.Namespace, policy.Name, "original");
+        seedComments.RestrictNamespacesTo(policy.Namespace);
+        sandbox.Seed(sandbox.CmtxPath(GpoSide.Machine), seedComments.ToBytes());
+        GpoSnapshot initial = sandbox.Store.Open();
+        var store = new PolicySaveStore(sandbox.Store, initial, readOnly: false);
+        var target = new PolicyRef(policy, GpoSide.Machine);
+        sandbox.FailNextWriteAfter(CommentFile, GpoFileNames.GptIniFile);
+
+        _ = Assert.Throws<GpoStoreException>(() => store.Apply(target, null, "partial comment"));
+        string partialComment = store.Snapshot!.Machine.Comments!.GetComment(policy.Namespace, policy.Name)!;
+        Assert.AreEqual("partial comment", partialComment);
+        Assert.AreNotEqual(
+            initial.Machine.Comments!.GetComment(policy.Namespace, policy.Name),
+            partialComment,
+            "restoring the original comment control is dirty against the comment that actually reached disk");
+
+        sandbox.AllowWrite(GpoFileNames.GptIniFile);
+        PolicyApplyOutcome retry = store.Apply(target, null, "original");
+        Assert.IsTrue(retry.Changed, "the original control value must be applied over the partial disk value");
+        Assert.AreEqual("original", store.Snapshot!.Machine.Comments?.GetComment(policy.Namespace, policy.Name));
+        Assert.AreEqual(1u, store.Snapshot.GptIni?.Version);
+    }
+
+    [TestMethod]
+    public void DialogDirtyState_UsesPartialDiskBaselineAndKeepsExplicitRecoveryDirty()
+    {
+        Assert.IsTrue(PolicyEditDirtyState.IsDirty(
+            PolicyState.NotConfigured,
+            "original",
+            optionsDirty: false,
+            baselineState: PolicyState.NotConfigured,
+            baselineComment: "partial comment",
+            recoveryPending: false), "restoring the original control value is dirty against the partial disk comment");
+
+        Assert.IsTrue(PolicyEditDirtyState.IsDirty(
+            PolicyState.NotConfigured,
+            "partial comment",
+            optionsDirty: false,
+            baselineState: PolicyState.NotConfigured,
+            baselineComment: "partial comment",
+            recoveryPending: true), "matching the partial snapshot still requires the pending save recovery");
+
+        Assert.IsFalse(PolicyEditDirtyState.IsDirty(
+            PolicyState.NotConfigured,
+            "partial comment",
+            optionsDirty: false,
+            baselineState: PolicyState.NotConfigured,
+            baselineComment: "partial comment",
+            recoveryPending: false), "a completed recovery leaves the unchanged dialog clean");
     }
 
     [TestMethod]

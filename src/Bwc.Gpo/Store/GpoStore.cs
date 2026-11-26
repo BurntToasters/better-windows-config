@@ -5,8 +5,9 @@ namespace Bwc.Gpo.Store;
 
 /// <summary>
 /// The local GPO as three kinds of file: open reads them, save runs the contract's save sequence (re-read under the
-/// write lock file, apply the caller's edit to the fresh models, skip everything when nothing changed, back up once per
-/// session, write comment.cmtx then Registry.pol then gpt.ini, refresh). Every byte goes through
+/// write lock file, apply the caller's edit to the fresh models, skip ordinary no-ops, resume incomplete stages from an
+/// earlier partial write in this session, back up once per session, write comment.cmtx then Registry.pol then gpt.ini,
+/// refresh). Every byte goes through
 /// <see cref="GpoFileWriter"/> and the write policy. One instance is one session: the backup is made once per instance.
 /// </summary>
 public sealed class GpoStore
@@ -14,6 +15,8 @@ public sealed class GpoStore
     private readonly IGpoStorePolicy _policy;
     private readonly GpoStoreOptions _options;
     private readonly GpoFileWriter _writer;
+    private readonly object _sessionGate = new();
+    private readonly Dictionary<GpoSide, RecoveryState> _recovery = [];
     private bool _backedUp;
 
     /// <summary>Creates a store.</summary>
@@ -32,6 +35,16 @@ public sealed class GpoStore
 
     /// <summary>The policy this store writes through.</summary>
     public IGpoStorePolicy Policy => _policy;
+
+    /// <summary>Updates the latest read-only decision without replacing this session or its backup state.</summary>
+    /// <param name="access">The current access decision; null means writable.</param>
+    public void UpdateAccess(GpoAccessResult? access)
+    {
+        lock (_sessionGate)
+        {
+            _options.Access = access;
+        }
+    }
 
     /// <summary>
     /// Reads the five files. Takes no lock and writes nothing. A missing file is an empty model; an unreadable or
@@ -60,7 +73,8 @@ public sealed class GpoStore
     /// One save of one side. Re-reads the files under the lock, runs <paramref name="edit"/> on the fresh models, and
     /// writes only what changed: <c>comment.cmtx</c> (when its bytes changed), <c>Registry.pol</c> (when its bytes
     /// changed), then <c>gpt.ini</c> with the side's version bump and extension pair (when Registry.pol was written),
-    /// then a refresh of that side. A save that changes nothing writes nothing, makes no backup and does not refresh.
+    /// then a refresh of that side. An ordinary no-op writes nothing, makes no backup and does not refresh; a retry may
+    /// finish pending work left by an earlier partial write in this store session.
     /// </summary>
     /// <param name="side">The side being saved. A policy of class Both is saved once per side.</param>
     /// <param name="edit">The change, run under the lock on models read just now. It must not call the store.</param>
@@ -71,6 +85,14 @@ public sealed class GpoStore
     public GpoSaveResult Save(GpoSide side, Action<GpoEditSession> edit, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(edit);
+        lock (_sessionGate)
+        {
+            return SaveSession(side, edit, cancellationToken);
+        }
+    }
+
+    private GpoSaveResult SaveSession(GpoSide side, Action<GpoEditSession> edit, CancellationToken cancellationToken)
+    {
         var root = _policy.GpoRoot;
         if (_options.Access is { IsReadOnly: true } access)
         {
@@ -81,13 +103,13 @@ public sealed class GpoStore
         cancellationToken.ThrowIfCancellationRequested();
 
         GpoSaveResult result;
-        bool polWritten;
+        bool shouldRefresh;
         using (WriteLock.Acquire(_policy, _options.LockTimeout))
         {
-            (result, polWritten) = SaveLocked(side, edit, cancellationToken);
+            (result, shouldRefresh) = SaveLocked(side, edit, cancellationToken);
         }
 
-        if (!polWritten)
+        if (!shouldRefresh)
         {
             return result;
         }
@@ -95,22 +117,25 @@ public sealed class GpoStore
         try
         {
             _policy.Refresher.Refresh(side);
+            _recovery.Remove(side);
             return result.With(refreshed: true, refreshFailure: null);
         }
         catch (Exception e) when (e is not OperationCanceledException and not OutOfMemoryException)
         {
+            _recovery[side] = new RecoveryState(PolPending: false, GptPending: false, RefreshPending: true);
             var failure = e as GpoStoreException
                 ?? new GpoStoreException(GpoStoreFailure.RefreshFailed, "Refresh", side.ToString(), 0, $"Refreshing {side} policy failed: {e.Message}", e);
             return result.With(refreshed: false, refreshFailure: failure);
         }
     }
 
-    private (GpoSaveResult Result, bool PolWritten) SaveLocked(GpoSide side, Action<GpoEditSession> edit, CancellationToken cancellationToken)
+    private (GpoSaveResult Result, bool ShouldRefresh) SaveLocked(GpoSide side, Action<GpoEditSession> edit, CancellationToken cancellationToken)
     {
         var root = _policy.GpoRoot;
         var polPath = GpoFileNames.PolPath(root, side);
         var cmtxPath = GpoFileNames.CmtxPath(root, side);
         var gptPath = GpoFileNames.GptIniPath(root);
+        RecoveryState recovery = _recovery.GetValueOrDefault(side);
 
         var pol = LoadPol(polPath);
         var cmtx = LoadCmtx(cmtxPath);
@@ -123,12 +148,25 @@ public sealed class GpoStore
         // The first save of a side creates its Registry.pol even when the edit adds no record: capture A/Machine_CommentOnly
         // and K/KeyLeadingBackslash_Enable (D10), where the file is the 8-byte empty document.
         var polChanged = pol.Document is { HasChanges: true } || (pol.Document is not null && !pol.Exists && cmtxChanged);
-        if (!polChanged && !cmtxChanged)
+        if (recovery.PolPending)
+        {
+            if (pol.Document is null)
+            {
+                throw pol.Failure as GpoStoreException
+                    ?? new GpoStoreException(
+                        GpoStoreFailure.Malformed, "Parse", polPath, 0, $"'{polPath}' is not valid and is left untouched: {pol.Failure?.Message}", pol.Failure);
+            }
+
+            polChanged = true;
+        }
+
+        bool gptChanged = polChanged || (cmtxChanged && GptIniRules.CommentOnlyChangeBumpsVersion) || recovery.GptPending;
+        bool shouldRefresh = polChanged || recovery.RefreshPending;
+        if (!polChanged && !cmtxChanged && !gptChanged && !shouldRefresh)
         {
             return (GpoSaveResult.NoChange, false);
         }
 
-        var gptChanged = polChanged || (cmtxChanged && GptIniRules.CommentOnlyChangeBumpsVersion);
         if (gptChanged)
         {
             PrepareGpt(gpt, gptPath, side, pol.Document is null ? null : pol.Document.RecordCount > 0);
@@ -186,9 +224,24 @@ public sealed class GpoStore
         }
         catch (GpoStoreException e) when (written.Count > 0)
         {
+            bool polWritten = written.Contains(polPath, StringComparer.OrdinalIgnoreCase);
+            bool gptWritten = written.Contains(gptPath, StringComparer.OrdinalIgnoreCase);
+            _recovery[side] = new RecoveryState(
+                PolPending: recovery.PolPending || (polChanged && !polWritten),
+                GptPending: recovery.GptPending || (gptChanged && !gptWritten),
+                RefreshPending: recovery.RefreshPending || shouldRefresh);
             // There is no rollback (docs/failure-modes/gpo-store.md, E10 and E15): say which files already reached disk.
             e.SetWrittenFiles(written.ToArray());
             throw;
+        }
+
+        if (shouldRefresh)
+        {
+            _recovery[side] = new RecoveryState(PolPending: false, GptPending: false, RefreshPending: true);
+        }
+        else
+        {
+            _recovery.Remove(side);
         }
 
         var result = new GpoSaveResult
@@ -198,8 +251,10 @@ public sealed class GpoStore
             PruneFailure = pruneFailure,
             GptVersion = version,
         };
-        return (result, polChanged);
+        return (result, shouldRefresh);
     }
+
+    private readonly record struct RecoveryState(bool PolPending, bool GptPending, bool RefreshPending);
 
     private static void PrepareGpt(Loaded<GptIni> gpt, string gptPath, GpoSide side, bool? sideHasSettings)
     {
