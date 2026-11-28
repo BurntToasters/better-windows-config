@@ -12,6 +12,9 @@ namespace Bwc.Core.Tests;
 public sealed class ElevatedDataTests
 {
     private const string Tool = "elev-test";
+    private const int ErrorUntrustedMountPointHResult = unchecked((int)0x800701C0);
+    private const string JunctionTraversalUnavailableMessage =
+        "Windows refused traversal of the test junction with ERROR_UNTRUSTED_MOUNT_POINT (448); no relocated folder can be opened, so this retarget scenario is inconclusive.";
 
     [TestCleanup]
     public void Cleanup()
@@ -214,10 +217,21 @@ public sealed class ElevatedDataTests
         string link = LinkTools.CreateJunction(Path.Combine(temp.Path, "profile"), real);
         try
         {
+            bool traversalAllowed = ProbeJunctionTraversal(temp.Path, link, real);
             string root = Path.Combine(link, "root");
             string logs = Path.Combine(root, Tool, "logs");
             Log.InitializeAs(Tool, new LogOptions { Directory = logs }, elevated: true, root);
             Log.Info("through a relocated profile");
+
+            if (!traversalAllowed)
+            {
+                Assert.IsNull(Log.CurrentFile, "logging must fail closed when Windows refuses the profile junction.");
+                Assert.AreEqual(
+                    0,
+                    Directory.GetFileSystemEntries(real).Length,
+                    "the profile target must stay empty when the relocation cannot be opened.");
+                return;
+            }
 
             Assert.IsNotNull(Log.CurrentFile, "a junction above the data root is a legitimate relocation.");
             Log.Shutdown();
@@ -229,7 +243,7 @@ public sealed class ElevatedDataTests
         {
             Log.Shutdown();
             SafeDataFolder.ReleaseAll();
-            LinkTools.RemoveJunction(link);
+            RemoveJunctionInside(temp.Path, link, real);
         }
     }
 
@@ -258,14 +272,17 @@ public sealed class ElevatedDataTests
             AssertPathInside(temp.Path, realProfile);
             AssertPathInside(temp.Path, redirectedProfile);
             LinkTools.CreateJunction(link, realProfile);
-            AssertJunctionTargetInside(temp.Path, link);
+            if (!ProbeJunctionTraversal(temp.Path, link, realProfile))
+            {
+                Assert.Inconclusive(JunctionTraversalUnavailableMessage);
+            }
 
             SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
             Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
             Assert.AreEqual(FolderAccess.Ok, access);
             Assert.AreEqual(Path.GetFullPath(realTool), Path.GetFullPath(folder.FinalPath));
 
-            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+            RetargetJunctionInside(temp.Path, link, realProfile, redirectedProfile);
 
             bool ensured = folder.EnsureFile("ensured.txt");
             bool appended = folder.Append("appended.txt", System.Text.Encoding.UTF8.GetBytes("held folder"));
@@ -284,7 +301,7 @@ public sealed class ElevatedDataTests
         finally
         {
             SafeDataFolder.ReleaseAll();
-            RemoveJunctionInside(temp.Path, link);
+            RemoveJunctionInside(temp.Path, link, realProfile, redirectedProfile);
         }
     }
 
@@ -314,12 +331,15 @@ public sealed class ElevatedDataTests
             AssertPathInside(temp.Path, realProfile);
             AssertPathInside(temp.Path, redirectedProfile);
             LinkTools.CreateJunction(link, realProfile);
-            AssertJunctionTargetInside(temp.Path, link);
+            if (!ProbeJunctionTraversal(temp.Path, link, realProfile))
+            {
+                Assert.Inconclusive(JunctionTraversalUnavailableMessage);
+            }
 
             SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
             Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
             Assert.AreEqual(FolderAccess.Ok, access);
-            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+            RetargetJunctionInside(temp.Path, link, realProfile, redirectedProfile);
 
             string[] names = folder.Names("*.txt").Order(StringComparer.Ordinal).ToArray();
             string[] after = Directory.GetFileSystemEntries(redirectedTool)
@@ -334,7 +354,7 @@ public sealed class ElevatedDataTests
         finally
         {
             SafeDataFolder.ReleaseAll();
-            RemoveJunctionInside(temp.Path, link);
+            RemoveJunctionInside(temp.Path, link, realProfile, redirectedProfile);
         }
     }
 
@@ -364,12 +384,15 @@ public sealed class ElevatedDataTests
             AssertPathInside(temp.Path, realProfile);
             AssertPathInside(temp.Path, redirectedProfile);
             LinkTools.CreateJunction(link, realProfile);
-            AssertJunctionTargetInside(temp.Path, link);
+            if (!ProbeJunctionTraversal(temp.Path, link, realProfile))
+            {
+                Assert.Inconclusive(JunctionTraversalUnavailableMessage);
+            }
 
             SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
             Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
             Assert.AreEqual(FolderAccess.Ok, access);
-            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+            RetargetJunctionInside(temp.Path, link, realProfile, redirectedProfile);
 
             SafeDataFolder? child = SafeDataFolder.Acquire(root, childPath, create: true, out FolderAccess childAccess);
             string[] after = Directory.GetFileSystemEntries(redirectedTool)
@@ -388,7 +411,7 @@ public sealed class ElevatedDataTests
         finally
         {
             SafeDataFolder.ReleaseAll();
-            RemoveJunctionInside(temp.Path, link);
+            RemoveJunctionInside(temp.Path, link, realProfile, redirectedProfile);
         }
     }
 
@@ -569,36 +592,93 @@ public sealed class ElevatedDataTests
         Assert.IsTrue(File.Exists(Path.Combine(folder, "settings.json.tmp-abc")));
     }
 
-    private static void RetargetJunctionInside(string sandbox, string link, string target)
+    private static bool ProbeJunctionTraversal(string sandbox, string link, string expectedTarget)
     {
-        AssertPathInside(sandbox, target);
-        LinkTools.RemoveJunction(link);
-        LinkTools.CreateJunction(link, target);
-        AssertJunctionTargetInside(sandbox, link);
-    }
-
-    private static void RemoveJunctionInside(string sandbox, string link)
-    {
-        if (!Directory.Exists(link))
-        {
-            return;
-        }
-
+        GetVerifiedJunctionTarget(sandbox, link, false, expectedTarget);
         try
         {
-            AssertJunctionTargetInside(sandbox, link);
+            _ = Directory.GetFileSystemEntries(link);
+            return true;
         }
-        finally
+        catch (IOException ex) when (ex.HResult == ErrorUntrustedMountPointHResult)
         {
-            LinkTools.RemoveJunction(link);
+            return false;
         }
     }
 
-    private static void AssertJunctionTargetInside(string sandbox, string link)
+    private static void RetargetJunctionInside(string sandbox, string link, string currentTarget, string target)
     {
-        FileSystemInfo? target = new DirectoryInfo(link).ResolveLinkTarget(returnFinalTarget: true);
+        RemoveJunctionInside(sandbox, link, currentTarget);
+        LinkTools.CreateJunction(link, target);
+        GetVerifiedJunctionTarget(sandbox, link, false, target);
+    }
+
+    private static void RemoveJunctionInside(string sandbox, string link, params string[] expectedTargets)
+    {
+        if (GetVerifiedJunctionTarget(sandbox, link, true, expectedTargets) is not null)
+        {
+            Directory.Delete(link, recursive: false);
+        }
+    }
+
+    private static FileSystemInfo? GetVerifiedJunctionTarget(
+        string sandbox,
+        string link,
+        bool allowMissing,
+        params string[] expectedTargets)
+    {
+        AssertPathInside(sandbox, link);
+        Assert.IsTrue(expectedTargets.Length > 0, "the test junction must have an expected sandbox target.");
+        foreach (string expectedTarget in expectedTargets)
+        {
+            AssertPathInside(sandbox, expectedTarget);
+        }
+
+        FileSystemInfo? target;
+        try
+        {
+            target = new DirectoryInfo(link).ResolveLinkTarget(returnFinalTarget: false);
+        }
+        catch (IOException ex) when (
+            allowMissing && (ex is FileNotFoundException || ex is DirectoryNotFoundException))
+        {
+            return null;
+        }
+
+        if (target is null && allowMissing)
+        {
+            try
+            {
+                _ = File.GetAttributes(link);
+            }
+            catch (FileNotFoundException)
+            {
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null;
+            }
+        }
+
         Assert.IsNotNull(target, "the test junction must resolve to a target.");
         AssertPathInside(sandbox, target.FullName);
+        string actual = Path.GetFullPath(target.FullName);
+        Assert.IsTrue(
+            expectedTargets.Any(expected => string.Equals(
+                actual,
+                Path.GetFullPath(expected),
+                StringComparison.OrdinalIgnoreCase)),
+            "the test junction must point directly to its expected sandbox target: " + actual);
+
+        FileAttributes attributes = File.GetAttributes(actual);
+        Assert.IsTrue(
+            (attributes & FileAttributes.Directory) != 0,
+            "the expected junction target must be a directory.");
+        Assert.IsFalse(
+            (attributes & FileAttributes.ReparsePoint) != 0,
+            "the expected junction target must be an ordinary directory, not another reparse point.");
+        return target;
     }
 
     private static void AssertPathInside(string sandbox, string path)
