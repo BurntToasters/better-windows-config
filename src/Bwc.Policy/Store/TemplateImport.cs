@@ -50,10 +50,10 @@ public sealed class TemplateImport
 
         var name = Path.GetFileName(full);
         var admxName = Path.GetFileNameWithoutExtension(name) + TemplateFileNames.AdmxExtension;
-        var tooLarge = CheckFolderCap(Path.GetDirectoryName(full)!);
-        if (tooLarge is not null)
+        var folderProblem = CheckSourceFolder(Path.GetDirectoryName(full)!);
+        if (folderProblem is not null)
         {
-            problems.Add(tooLarge);
+            problems.Add(folderProblem);
             return new TemplateImportCheck(problems);
         }
 
@@ -263,15 +263,31 @@ public sealed class TemplateImport
         };
     }
 
-    private static TemplateImportProblem? CheckFolderCap(string folder)
+    private static TemplateImportProblem? CheckSourceFolder(string folder)
     {
-        if (!Directory.Exists(folder))
-        {
-            return null;
-        }
-
         try
         {
+            FileAttributes attributes;
+            try
+            {
+                attributes = File.GetAttributes(folder);
+            }
+            catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+            {
+                // The selected file will be reported as missing by ReadBounded.
+                return null;
+            }
+
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                return new TemplateImportProblem(TemplateImportProblemCode.SourceReparsePoint, folder);
+            }
+
+            if ((attributes & FileAttributes.Directory) == 0)
+            {
+                return null;
+            }
+
             var count = 0;
             foreach (var path in Directory.EnumerateFiles(folder))
             {

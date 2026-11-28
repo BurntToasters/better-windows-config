@@ -102,12 +102,17 @@ public sealed class TemplateStoreWriter
     {
         RequireAdmxName(admxFileName);
         var removed = new List<string>();
-        if (!Directory.Exists(StoreRoot))
+        var problem = ProtectedDataRoot.Verify(dataRoot, StoreRoot, acl);
+        if (problem?.Status == ProtectedFolderStatus.Missing)
         {
             return removed;
         }
 
-        CheckFolder(StoreRoot);
+        if (problem is not null)
+        {
+            throw Refusal(problem);
+        }
+
         DeleteIfPresent(Path.Combine(StoreRoot, admxFileName), removed);
         TemplateStoreException? failure = null;
         foreach (var folder in EnumerateLanguageFolders())

@@ -20,6 +20,21 @@ internal static partial class Links
         return process.ExitCode == 0;
     }
 
+    /// <summary>Checks whether Windows permits traversal of the test junction created by this user.</summary>
+    public static bool CanTraverseJunction(string junction)
+    {
+        const int UntrustedMountPoint = unchecked((int)0x800701C0);
+        try
+        {
+            _ = Directory.GetFileSystemEntries(junction);
+            return true;
+        }
+        catch (IOException ex) when (ex.HResult == UntrustedMountPoint)
+        {
+            return false;
+        }
+    }
+
     /// <summary>The 8.3 form of an existing path. Equals the input when the volume has no short names for it.</summary>
     public static string ShortPath(string path)
     {

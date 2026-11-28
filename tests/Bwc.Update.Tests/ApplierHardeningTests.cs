@@ -76,6 +76,7 @@ public sealed class ApplierHardeningTests
 
         // The staging root is reached through a junction in its parent, as when TEMP is relocated through one.
         var stagingRoot = Path.Combine(junction, "staging");
+        bool traversalAllowed = Links.CanTraverseJunction(junction);
         var folderName = Path.GetFileName(h.Folder);
         var request = h.Request() with
         {
@@ -85,6 +86,16 @@ public sealed class ApplierHardeningTests
         };
 
         var outcome = await h.Applier.ApplyAsync(request, CancellationToken.None);
+
+        if (!traversalAllowed)
+        {
+            Assert.AreEqual(UpdateFailure.PathRejected, outcome.Failure, outcome.Detail);
+            Assert.IsFalse(outcome.ElevatedHelperStarted);
+            Assert.IsFalse(outcome.InstallerStarted);
+            Assert.AreEqual(0, h.Host.ElevatedRuns.Count);
+            Assert.AreEqual(0, h.Host.Launched);
+            return;
+        }
 
         Assert.AreEqual(UpdateFailure.None, outcome.Failure, outcome.Detail);
         Assert.IsTrue(outcome.ElevatedHelperStarted);

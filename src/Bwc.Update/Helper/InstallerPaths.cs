@@ -27,7 +27,7 @@ public static partial class InstallerPaths
 
         if (!Directory.Exists(stagingRoot))
         {
-            return Refuse("staging root does not exist");
+            return Refuse("staging root does not exist or is inaccessible");
         }
 
         string root;

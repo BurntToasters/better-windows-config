@@ -64,7 +64,9 @@ public sealed class HardeningTests
         }
 
         var viaJunction = Path.Combine(junction, InstallerPaths.InstallerName);
-        using var file = File.Open(viaJunction, FileMode.Open, FileAccess.Read, FileShare.Read);
+        // Compare the alias with the real handle path even when Windows only allows opening the target directly.
+        var openPath = Links.CanTraverseJunction(junction) ? viaJunction : realInstaller;
+        using var file = File.Open(openPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var actual = InstallerPaths.FinalPathOf(file.SafeFileHandle);
 
         Assert.IsNotNull(actual, "the final path of an open file can be read");

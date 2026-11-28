@@ -36,8 +36,9 @@ public sealed class FolderLocationTests
 
         using SafeFileHandle? folder = InstallerPaths.OpenFolder(held);
         Assert.IsNotNull(folder);
-        // The name the helper checked leads, through the junction, to a file in another folder.
-        using var file = File.Open(Path.Combine(swap, InstallerPaths.InstallerName), FileMode.Open, FileAccess.Read, FileShare.Read);
+        // The location check takes a handle. When Windows blocks the alias, open the same outside file directly.
+        var outside = Links.CanTraverseJunction(swap) ? swap : other;
+        using var file = File.Open(Path.Combine(outside, InstallerPaths.InstallerName), FileMode.Open, FileAccess.Read, FileShare.Read);
 
         Assert.IsFalse(InstallerPaths.InFolder(folder, InstallerPaths.FinalPathOf(file.SafeFileHandle)!), "a swapped installer is refused");
     }
