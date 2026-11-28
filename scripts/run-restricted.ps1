@@ -54,6 +54,8 @@ public static class BwcRestricted
     private const uint TokenAdjustDefault = 0x0080;
     private const uint DisableMaxPrivilege = 0x1;
     private const uint LuaToken = 0x4;
+    private const int TokenOwnerClass = 4;
+    private const int TokenDefaultDaclClass = 6;
     private const int TokenElevationClass = 20;
     private const int TokenIntegrityLevelClass = 25;
     private const uint SeGroupIntegrity = 0x20;
@@ -81,6 +83,18 @@ public static class BwcRestricted
         public int Length;
         public IntPtr SecurityDescriptor;
         public int InheritHandle;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenOwner
+    {
+        public IntPtr Owner;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TokenDefaultDacl
+    {
+        public IntPtr DefaultDacl;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -165,6 +179,10 @@ public static class BwcRestricted
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool ConvertStringSecurityDescriptorToSecurityDescriptorW(string sddl, uint revision,
         out IntPtr descriptor, out uint size);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool GetSecurityDescriptorDacl(IntPtr descriptor, out bool daclPresent, out IntPtr dacl,
+        out bool daclDefaulted);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern IntPtr CreateWindowStationW(string name, uint flags, uint access, ref SecurityAttributes attributes);
@@ -402,6 +420,10 @@ public static class BwcRestricted
         var result = new BwcRestrictedResult();
         IntPtr ownToken = IntPtr.Zero;
         IntPtr restricted = IntPtr.Zero;
+        IntPtr userSid = IntPtr.Zero;
+        IntPtr ownerInfo = IntPtr.Zero;
+        IntPtr defaultDaclDescriptor = IntPtr.Zero;
+        IntPtr defaultDaclInfo = IntPtr.Zero;
         IntPtr mediumSid = IntPtr.Zero;
         IntPtr label = IntPtr.Zero;
         IntPtr stdin = IntPtr.Zero;
@@ -415,6 +437,33 @@ public static class BwcRestricted
         {
             Check(OpenProcessToken(GetCurrentProcess(), TokenDuplicate | TokenQuery | TokenAssignPrimary | TokenAdjustDefault, out ownToken), "open-token");
             Check(CreateRestrictedToken(ownToken, DisableMaxPrivilege | LuaToken, 0, IntPtr.Zero, 0, IntPtr.Zero, 0, IntPtr.Zero, out restricted), "restrict-token");
+
+            // C28: an elevated token's TokenOwner is Administrators and its TokenDefaultDacl grants only Administrators
+            // and SYSTEM. LUA_TOKEN marks Administrators deny-only without updating TokenDefaultDacl, so any grandchild
+            // started with CREATE_NO_WINDOW or default security dies at init (0xC0000142). Reset both to user + SYSTEM.
+            string userSidText = System.Security.Principal.WindowsIdentity.GetCurrent().User.Value;
+            Check(ConvertStringSidToSid(userSidText, out userSid), "user-sid");
+            var owner = new TokenOwner();
+            owner.Owner = userSid;
+            int ownerSize = Marshal.SizeOf(typeof(TokenOwner));
+            ownerInfo = Marshal.AllocHGlobal(ownerSize);
+            Marshal.StructureToPtr(owner, ownerInfo, false);
+            Check(SetTokenInformation(restricted, TokenOwnerClass, ownerInfo, ownerSize), "token-owner");
+
+            uint defaultDaclDescriptorSize;
+            Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                "D:(A;;GA;;;" + userSidText + ")(A;;GA;;;SY)", 1, out defaultDaclDescriptor, out defaultDaclDescriptorSize), "default-dacl-descriptor");
+            bool daclPresent;
+            IntPtr daclPointer;
+            bool daclDefaulted;
+            Check(GetSecurityDescriptorDacl(defaultDaclDescriptor, out daclPresent, out daclPointer, out daclDefaulted)
+                && daclPresent && daclPointer != IntPtr.Zero, "default-dacl-extract");
+            var defaultDacl = new TokenDefaultDacl();
+            defaultDacl.DefaultDacl = daclPointer;
+            int defaultDaclSize = Marshal.SizeOf(typeof(TokenDefaultDacl));
+            defaultDaclInfo = Marshal.AllocHGlobal(defaultDaclSize);
+            Marshal.StructureToPtr(defaultDacl, defaultDaclInfo, false);
+            Check(SetTokenInformation(restricted, TokenDefaultDaclClass, defaultDaclInfo, defaultDaclSize), "default-dacl");
 
             Check(ConvertStringSidToSid("S-1-16-8192", out mediumSid), "medium-sid");
             var mandatory = new TokenMandatoryLabel();
@@ -513,6 +562,10 @@ public static class BwcRestricted
             if (station != IntPtr.Zero) CloseWindowStation(station);
             if (label != IntPtr.Zero) Marshal.FreeHGlobal(label);
             if (mediumSid != IntPtr.Zero) LocalFree(mediumSid);
+            if (defaultDaclInfo != IntPtr.Zero) Marshal.FreeHGlobal(defaultDaclInfo);
+            if (defaultDaclDescriptor != IntPtr.Zero) LocalFree(defaultDaclDescriptor);
+            if (ownerInfo != IntPtr.Zero) Marshal.FreeHGlobal(ownerInfo);
+            if (userSid != IntPtr.Zero) LocalFree(userSid);
             if (restricted != IntPtr.Zero) CloseHandle(restricted);
             if (ownToken != IntPtr.Zero) CloseHandle(ownToken);
         }

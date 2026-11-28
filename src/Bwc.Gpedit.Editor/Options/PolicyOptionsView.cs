@@ -151,6 +151,29 @@ internal sealed class PolicyOptionsView
     /// <summary>The values as one string that two calls can compare.</summary>
     internal string Fingerprint() => OptionValueJson.Serialize(ReadValues().OrderBy(p => p.Key, StringComparer.Ordinal));
 
+    /// <summary>The value fingerprint of the current disk snapshot and defaults, without reading the live controls.</summary>
+    internal string StoredFingerprint()
+    {
+        var values = new Dictionary<string, ElementValue>(StringComparer.OrdinalIgnoreCase);
+        if (_snapshot is { State: PolicyState.Enabled } snapshot)
+        {
+            foreach ((string id, ElementValue value) in snapshot.Elements)
+            {
+                values[id] = value;
+            }
+        }
+
+        foreach (OptionField field in _fields)
+        {
+            if (field.Element is { } element && !values.ContainsKey(element.Id) && _defaults.TryGetValue(element.Id, out ElementValue? fallback))
+            {
+                values[element.Id] = fallback;
+            }
+        }
+
+        return OptionValueJson.Serialize(values.OrderBy(p => p.Key, StringComparer.Ordinal));
+    }
+
     /// <summary>Enables or disables every control. The values stay.</summary>
     internal void SetEnabled(bool enabled)
     {

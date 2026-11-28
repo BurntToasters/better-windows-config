@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Xml.Linq;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Editing;
@@ -63,6 +64,9 @@ internal sealed class GpeditSandbox
     /// <summary>True makes the in-memory store of the editor report read-only (BWC_E2E_GPEDIT_READONLY=1).</summary>
     internal bool ReadOnly { get; set; }
 
+    /// <summary>Holds the import-store listing in the E2E flavor to exercise the template preload race.</summary>
+    internal int TemplateReadDelayMilliseconds { get; set; }
+
     /// <summary>The sandbox for a test. <paramref name="name"/> is the name given to <see cref="GpeditRun.Open"/>.</summary>
     internal static GpeditSandbox Create(string name) => new("console-" + name);
 
@@ -82,6 +86,11 @@ internal sealed class GpeditSandbox
         if (ReadOnly)
         {
             environment["BWC_E2E_GPEDIT_READONLY"] = "1";
+        }
+
+        if (TemplateReadDelayMilliseconds > 0)
+        {
+            environment["BWC_E2E_GPEDIT_TEMPLATE_READ_DELAY_MS"] = TemplateReadDelayMilliseconds.ToString(CultureInfo.InvariantCulture);
         }
 
         if (shape)
@@ -247,6 +256,46 @@ internal sealed class GpeditSandbox
         }
 
         TemplateRoot = target;
+    }
+
+    /// <summary>
+    /// Copies the standard fixture for context-menu tests and removes policies other than the Machine, User and Both
+    /// class examples from the private copy. Category declarations and the checked-in fixture stay unchanged.
+    /// </summary>
+    internal void UseCompactContextMenuTemplates()
+    {
+        UseTemplatesWithBadCases();
+
+        string path = Path.Combine(TemplateRoot, "BwcOracle.admx");
+        XDocument document = XDocument.Load(path, LoadOptions.PreserveWhitespace);
+        XElement root = document.Root
+            ?? throw new InvalidDataException($"The BWC Oracle template has no root element: {path}.");
+        XNamespace ns = root.Name.Namespace;
+        XElement policies = root.Element(ns + "policies")
+            ?? throw new InvalidDataException($"The BWC Oracle template has no policies element: {path}.");
+        var retainedNames = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Pol_Class_Machine",
+            "Pol_Class_User",
+            "Pol_Class_Both",
+        };
+        List<XElement> policyElements = policies.Elements(ns + "policy").ToList();
+        HashSet<string> foundNames = policyElements
+            .Select(policy => (string?)policy.Attribute("name"))
+            .Where(name => name is not null && retainedNames.Contains(name))
+            .Select(name => name!)
+            .ToHashSet(StringComparer.Ordinal);
+        if (!foundNames.SetEquals(retainedNames))
+        {
+            throw new InvalidDataException($"The BWC Oracle template is missing one of the context-menu policies: {path}.");
+        }
+
+        foreach (XElement policy in policyElements.Where(policy => !retainedNames.Contains((string?)policy.Attribute("name") ?? string.Empty)))
+        {
+            policy.Remove();
+        }
+
+        document.Save(path, SaveOptions.DisableFormatting);
     }
 
     /// <summary>
@@ -485,12 +534,36 @@ internal sealed class GpeditRun : IDisposable
 
         for (int level = current.Length; level > Math.Max(common, 1); level--)
         {
-            int before = level;
-            AutomationElement? up = Shell.Find(ShellRun.ButtonId("UpOneLevel"));
-            up?.Patterns.Invoke.PatternOrDefault?.Invoke();
-            if (!ShellRun.WaitUntil(() => NodePath().Length < before, TimeSpan.FromSeconds(8)))
+            string[] expectedCurrent = current[..level];
+            string[] expectedParent = current[..(level - 1)];
+            FlaUI.Core.Patterns.IInvokePattern? invoke = null;
+            bool ready = ShellRun.WaitUntil(
+                () =>
+                {
+                    if (!NodePath().SequenceEqual(expectedCurrent))
+                    {
+                        invoke = null;
+                        return false;
+                    }
+
+                    AutomationElement? up = Shell.Find(ShellRun.ButtonId("UpOneLevel"));
+                    invoke = up is { IsEnabled: true } ? up.Patterns.Invoke.PatternOrDefault : null;
+                    return invoke is not null;
+                },
+                TimeSpan.FromSeconds(8));
+            if (!ready || invoke is null)
             {
-                throw new InvalidOperationException($"Up One Level did not leave '{string.Join(" > ", NodePath())}'.");
+                throw new InvalidOperationException(
+                    $"Up One Level was unavailable before navigation. Required current path '{string.Join(" > ", expectedCurrent)}'; " +
+                    $"current path '{string.Join(" > ", NodePath())}'; reason: an enabled Up One Level button with Invoke was unavailable during readiness wait.");
+            }
+
+            invoke.Invoke();
+            if (!ShellRun.WaitUntil(() => NodePath().SequenceEqual(expectedParent), TimeSpan.FromSeconds(8)))
+            {
+                throw new InvalidOperationException(
+                    $"Up One Level did not select the required parent path '{string.Join(" > ", expectedParent)}'. " +
+                    $"Current path '{string.Join(" > ", NodePath())}'; reason: the parent path was not reached after one invocation.");
             }
         }
 

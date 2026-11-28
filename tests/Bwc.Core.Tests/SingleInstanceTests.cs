@@ -24,6 +24,69 @@ public sealed class SingleInstanceTests
     }
 
     [TestMethod]
+    public void EffectiveDefaultAndIgnoredRootsShareScope()
+    {
+        string? originalRoot = Environment.GetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable);
+        string toolId = NewToolId();
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, null);
+            string effectiveDefault = AppPaths.BaseDirectory;
+            using var defaultRoot = SingleInstance.Create(toolId);
+            Assert.IsTrue(defaultRoot.IsFirstInstance);
+
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, "relative-bwc-test-root");
+            using var ignoredRelative = SingleInstance.Create(toolId);
+            Assert.IsFalse(ignoredRelative.IsFirstInstance,
+                "a relative value ignored by AppPaths must share the effective default scope.");
+            Assert.AreEqual(defaultRoot.InstanceName, ignoredRelative.InstanceName);
+
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, effectiveDefault);
+            using var explicitDefault = SingleInstance.Create(toolId);
+            Assert.IsFalse(explicitDefault.IsFirstInstance,
+                "an explicit accepted root equal to AppPaths.BaseDirectory must share the default scope.");
+            Assert.AreEqual(defaultRoot.InstanceName, explicitDefault.InstanceName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, originalRoot);
+        }
+    }
+
+    [TestMethod]
+    public void DifferentEffectiveRootsHaveDifferentScopesAndEquivalentRootsShare()
+    {
+        string? originalRoot = Environment.GetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable);
+        using var firstRoot = new TempDirectory();
+        using var secondRoot = new TempDirectory();
+        string toolId = NewToolId();
+        try
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, firstRoot.Path);
+            using var first = SingleInstance.Create(toolId);
+            Assert.IsTrue(first.IsFirstInstance);
+
+            Environment.SetEnvironmentVariable(
+                AppPaths.DataRootEnvironmentVariable,
+                Path.TrimEndingDirectorySeparator(firstRoot.Path) + Path.DirectorySeparatorChar);
+            using var sameRootWithSeparator = SingleInstance.Create(toolId);
+            Assert.IsFalse(sameRootWithSeparator.IsFirstInstance,
+                "a trailing separator must not create another scope.");
+            Assert.AreEqual(first.InstanceName, sameRootWithSeparator.InstanceName);
+
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, secondRoot.Path);
+            using var second = SingleInstance.Create(toolId);
+            Assert.IsTrue(second.IsFirstInstance,
+                "a different accepted root must not activate an instance using the first root.");
+            Assert.AreNotEqual(first.InstanceName, second.InstanceName);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(AppPaths.DataRootEnvironmentVariable, originalRoot);
+        }
+    }
+
+    [TestMethod]
     public void MessageRoundTripsToTheFirstInstance()
     {
         string toolId = NewToolId();

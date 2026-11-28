@@ -35,7 +35,10 @@ Options for `scripts/build-installer.js`:
 
 A real run does these steps in order: it checks for NSIS, removes the previous result, checks the
 signing variables and the Artifact Signing Client Tools (unless `SKIP_WIN_CODESIGN=1`), reuses
-`publish/<rid>` when the last publish passed or runs `scripts/dotnet-build.js`, requires
+`publish/<rid>` only when its build record proves a passing publish for the current version, RID,
+flavor, and exact HEAD commit with a clean worktree at both build start and finish. A legacy record
+without that proof, a dirty or changed source state, or any mismatch triggers
+`scripts/dotnet-build.js` again. The installer then requires
 `BetterWindowsConfig.exe`, `BwcRegedit.exe`, `BwcGpedit.exe`, and `BwcUpdate.exe` in the publish folder, signs the BWC
 binaries in that folder, generates the notices, writes the payload include, checks the NSIS source,
 runs `makensis` (which signs the setup EXE and the uninstaller), audits the manifest level of the built

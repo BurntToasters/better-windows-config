@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Drawing;
 using Bwc.E2E.ConsoleFrame;
 using Bwc.E2E.ContextMenus;
 using Bwc.E2E.Controls;
+using Bwc.E2E.Editing;
 using Bwc.E2E.Gpedit.Commands;
 using Bwc.E2E.Gpedit.Filter;
 using Bwc.E2E.Harness;
@@ -196,5 +198,137 @@ public sealed class GpeditImportDialogTests
 
         run.WriteArtifacts("gpedit-import-dialog-layout.png");
         checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
+    public void Gpedit_Import_Dialog_ModalRace()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        var checks = new GpeditChecks("import", "dialog.modalRace");
+        GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-import-dialog-modal-race");
+        sandbox.DialogEnabled = true;
+        sandbox.TemplateReadDelayMilliseconds = 15000;
+        sandbox.SeedStandard();
+        using GpeditRun run = GpeditRun.Open("gpedit-import-dialog-modal-race", sandbox);
+        using var driver = new EditingDriver(run.Shell.Session);
+        int windowsBefore = ProcessWindows.Of(run.Shell.Automation, run.Shell.Session.ProcessId).Length;
+
+        run.GoTo(GpeditTemplatesRun.AdminComputer);
+        _ = run.WaitNode(GpeditTemplatesRun.AdminComputer);
+        bool started = run.InvokeMenuEntry(GpeditCommandIds.ActionMenu, TemplateIds.AddRemove);
+        checks.Record("preload.started", started, "Add/Remove Templates starts its delayed store listing.");
+        checks.Record(
+            "preload.noDialogYet",
+            driver.WaitForElement(TemplateIds.Dialog, TimeSpan.FromMilliseconds(300)) is null,
+            "the delayed listing has not opened its dialog yet.");
+
+        // While the list is being read, none of the other modal entrypoints may open over the same owner.
+        run.GoTo(BasicsPath);
+        run.SelectRow(MachineFlag);
+        bool editInvoked = run.InvokeMenuEntry(GpeditCommandIds.ActionMenu, GpeditCommandIds.Edit);
+        bool editStayedClosed = DismissUnexpectedDialog(driver, "DialogRoot", GpeditDialog.Cancel);
+        checks.Record("policy.blocked", editInvoked && editStayedClosed, "Edit cannot open a setting dialog during template preload.");
+
+        bool filterInvoked = run.InvokeMenuEntry(FilterIds.ViewMenu, FilterIds.Options);
+        bool filterStayedClosed = DismissUnexpectedDialog(driver, FilterIds.Dialog, FilterIds.Cancel);
+        checks.Record("filter.blocked", filterInvoked && filterStayedClosed, "Filter Options cannot open during template preload.");
+
+        bool frameInvoked = run.InvokeMenuEntry(FrameIds.ViewMenu, FrameIds.ColumnsCommand);
+        bool frameStayedClosed = DismissUnexpectedDialog(driver, FrameIds.ColumnsDialog, FrameIds.ColumnsCancel);
+        checks.Record("frame.blocked", frameInvoked && frameStayedClosed, "Add/Remove Columns cannot open during template preload.");
+
+        bool optionsInvoked = run.InvokeMenuEntry(OptionsIds.FileMenu, OptionsIds.OptionsCommand);
+        bool optionsStayedClosed = DismissUnexpectedDialog(driver, OptionsIds.Dialog, OptionsIds.Cancel);
+        checks.Record("options.blocked", optionsInvoked && optionsStayedClosed, "File Options cannot open during template preload.");
+
+        string aboutTitle = AboutProbe.TitleFor(OptionsDialogRead.WindowTitle(run.Shell));
+        bool aboutInvoked = run.InvokeMenuEntry(OptionsIds.HelpMenu, OptionsIds.AboutCommand);
+        IntPtr about = AboutProbe.IsOpen(run, aboutTitle) ? AboutProbe.Wait(run, aboutTitle) : IntPtr.Zero;
+        bool aboutStayedClosed = about == IntPtr.Zero;
+        if (about != IntPtr.Zero)
+        {
+            _ = AboutProbe.Close(about, "gpedit.import.modalRace.about.foreground");
+        }
+
+        checks.Record("helpDialog.blocked", aboutInvoked && aboutStayedClosed, "Help About cannot open during template preload.");
+
+        int helps = run.Count("HelpRequests");
+        _ = run.InvokeMenuEntry(GpeditCommandIds.ActionMenu, GpeditCommandIds.Help);
+        checks.Record("help.blocked", run.Count("HelpRequests") == helps, $"HelpRequests stayed at {helps} during template preload.");
+
+        bool refreshInvoked = run.InvokeButton("Refresh", foreground: false);
+        Thread.Sleep(750);
+        checks.Record(
+            "refresh.queued",
+            refreshInvoked && run.Count("Refreshes") == 0,
+            $"Refresh was queued while the list was reading; Refreshes={run.Count("Refreshes")}.");
+
+        bool templateOpened = driver.WaitForElement(TemplateIds.Dialog, TimeSpan.FromSeconds(20)) is not null;
+        checks.Record("template.dialogOpens", templateOpened, "the original template request opens after preload.");
+        bool closed = templateOpened && driver.Invoke(TemplateIds.Close)
+            && ShellRun.WaitUntil(
+                () => ProcessWindows.Of(run.Shell.Automation, run.Shell.Session.ProcessId).Length == windowsBefore,
+                TimeSpan.FromSeconds(8));
+        checks.Record("template.dialogCloses", closed, "closing the template dialog releases its modal reservation.");
+        checks.Record(
+            "refresh.afterClose",
+            run.WaitCount("Refreshes", 1) && run.WaitReloadSettled(),
+            $"one queued refresh applies after close; Refreshes={run.Count("Refreshes")}, Reloading={run.Str("Reloading")}.");
+        checks.Record("refresh.lastCommand", run.Str("LastCommand") == "Refresh", $"LastCommand='{run.Str("LastCommand")}'.");
+
+        run.WriteArtifacts("gpedit-import-dialog-modal-race.png");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
+    public void Gpedit_Import_Dialog_ClosedDuringPreload()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        var checks = new GpeditChecks("import", "dialog.closedDuringPreload");
+        GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-import-dialog-closed-during-preload");
+        sandbox.TemplateReadDelayMilliseconds = 5000;
+        sandbox.SeedStandard();
+        using GpeditRun run = GpeditRun.Open("gpedit-import-dialog-closed-during-preload", sandbox);
+        using var driver = new EditingDriver(run.Shell.Session);
+
+        run.GoTo(GpeditTemplatesRun.AdminComputer);
+        _ = run.WaitNode(GpeditTemplatesRun.AdminComputer);
+        bool started = run.InvokeMenuEntry(GpeditCommandIds.ActionMenu, TemplateIds.AddRemove);
+        bool awaiting = started && driver.WaitForElement(TemplateIds.Dialog, TimeSpan.FromMilliseconds(300)) is null;
+        checks.Record("preload.awaiting", awaiting, "the editor closes while the store listing is still pending.");
+        run.WriteArtifacts("gpedit-import-dialog-closed-during-preload.png");
+
+        int processId = run.Shell.Session.ProcessId;
+        run.Shell.Session.Close();
+        Thread.Sleep(5500);
+        bool exited;
+        try
+        {
+            using Process process = Process.GetProcessById(processId);
+            exited = process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            exited = true;
+        }
+
+        checks.Record("owner.closed", exited, "the owner has closed after the pending preload completed.");
+        checks.Record("noWindowsRemain", ProcessWindows.Of(run.Shell.Automation, processId).Length == 0, "no modal window remains for the closed process.");
+        checks.AssertAllPassed();
+    }
+
+    private static bool DismissUnexpectedDialog(EditingDriver driver, string dialogId, string cancelId)
+    {
+        if (driver.WaitForElement(dialogId, TimeSpan.FromMilliseconds(250)) is null)
+        {
+            return true;
+        }
+
+        _ = driver.Invoke(cancelId);
+        return false;
     }
 }

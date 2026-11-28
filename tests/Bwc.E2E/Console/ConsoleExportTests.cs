@@ -1,3 +1,4 @@
+using System.Text;
 using Bwc.E2E.Controls;
 using Bwc.E2E.Gpedit;
 using Bwc.E2E.Gpedit.Commands;
@@ -179,6 +180,42 @@ public sealed class ConsoleExportTests
     [TestMethod]
     [TestCategory("Console")]
     [TestCategory("E2EOnly")]
+    public void Console_Export_CommaCellQuotesLineBreaks()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        var checks = new ShellChecks("export.comma-multiline", FrameArea);
+        using ListRun run = ListRun.Open(
+            "frame-export-comma-multiline",
+            8,
+            new Dictionary<string, string> { ["BWC_E2E_CONSOLE_MULTILINE"] = "true" });
+        string path = Path.Combine(FrameExport.FolderOf(run.Shell), "comma-multiline.csv");
+
+        checks.Record("comma.pressed", PressExport(run.Shell), "the Export List button runs.");
+        _ = FrameExport.SaveThroughDialog(run.Shell, checks, "comma", 2, path);
+        byte[]? actual = FrameExport.WaitForFile(path);
+        string baseline = Encoding.ASCII.GetString(FrameExport.Fixture("frame-ansi-comma.csv"));
+        string expectedText = baseline.Replace(
+            "Setting 00002,Not configured,Yes\r\n",
+            "Setting 00002,Not configured,\"first line\r\nsecond line\"\r\n",
+            StringComparison.Ordinal);
+        byte[] expected = Encoding.ASCII.GetBytes(expectedText);
+        checks.Record(
+            "comma.fixture",
+            actual is not null && actual.SequenceEqual(expected),
+            actual is null
+                ? $"no file was written; the expected file has {expected.Length} bytes."
+                : actual.SequenceEqual(expected)
+                    ? $"the file matches the multiline CSV fixture ({expected.Length} bytes)."
+                    : $"the file has {actual.Length} bytes; expected {expected.Length} bytes with the multiline cell quoted; first differing byte {FirstDifference(actual, expected)}.");
+        FrameExport.Publish(run.Shell, "comma-multiline", path);
+        checks.Record("ownerEnabled", FrameRun.OwnerEnabled(run.Shell), "the main window is enabled again.");
+        run.Shell.WriteArtifacts("console-frame-export-comma-multiline.png", FrameRun.Area);
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Console")]
+    [TestCategory("E2EOnly")]
     public void Console_Export_File_Unicode()
     {
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
@@ -336,6 +373,20 @@ public sealed class ConsoleExportTests
         checks.Record("filterStaysOn", run.Count("FilterOn") == 1, $"FilterOn={run.Str("FilterOn")} after the export.");
         run.WriteArtifacts("console-export-editor-filtered.png");
         checks.AssertAllPassed();
+    }
+
+    private static int FirstDifference(byte[] actual, byte[] expected)
+    {
+        int common = Math.Min(actual.Length, expected.Length);
+        for (int i = 0; i < common; i++)
+        {
+            if (actual[i] != expected[i])
+            {
+                return i;
+            }
+        }
+
+        return common;
     }
 
     /// <summary>Presses the Export List toolbar button through UI Automation. False when it is missing or disabled.</summary>

@@ -12,10 +12,10 @@ namespace Bwc.E2E.Dialogs;
 
 /// <summary>
 /// VIEW-019: the Add to Favorites, Remove Favorites, and Find dialogs are opened, and each control's UIA
-/// rectangle is compared with the measured classic rectangle in docs/parity/oracle/regedit-dialog-rects.json.
-/// The classic numbers are device pixels at 192 DPI relative to the dialog client origin. They are scaled by
-/// the BWC dialog DPI divided by 192, and the tolerance is 4 device pixels per edge at 192 DPI, scaled the same
-/// way. The result artifact records the measured and expected rectangles for every control.
+/// rectangle is compared with the measured classic rectangle. The exact 144-DPI capture is used at 144 DPI;
+/// other DPI values use the 192-DPI reference scaled to the BWC dialog DPI. The tolerance is 4 device pixels
+/// per edge at 192 DPI, scaled to the target DPI (3 pixels at 144 DPI). The result artifact records the reference
+/// DPI and scale as well as the measured and expected rectangles for every control.
 /// </summary>
 [TestClass]
 public sealed class SmallDialogGeometryTests
@@ -29,6 +29,7 @@ public sealed class SmallDialogGeometryTests
     private const string FavoriteOne = "Existing";
     private const string FavoriteTwo = "Second";
     private const int ClassicDpi = 192;
+    private const int NativeDpi = 144;
     private const int ToleranceAtClassicDpi = 4;
     private const string RectsDialogAdd = "add-favorite";
     private const string RectsDialogRemove = "remove-favorite";
@@ -84,8 +85,11 @@ public sealed class SmallDialogGeometryTests
         E2EGuards.RequireMutatingFlavor(config);
         config.EnsureExecutablesExist();
 
-        string rectsPath = Path.Combine(config.RepoRoot, "docs", "parity", "oracle", "regedit-dialog-rects.json");
-        using JsonDocument classic = JsonDocument.Parse(File.ReadAllText(rectsPath));
+        string oracleRoot = Path.Combine(config.RepoRoot, "docs", "parity", "oracle");
+        string classic192Path = Path.Combine(oracleRoot, "regedit-dialog-rects.json");
+        string classic144Path = Path.Combine(oracleRoot, "regedit-dialog-rects-144dpi.json");
+        using JsonDocument classic192 = JsonDocument.Parse(File.ReadAllText(classic192Path));
+        using JsonDocument classic144 = JsonDocument.Parse(File.ReadAllText(classic144Path));
 
         var sandbox = new SandboxRegistry(config);
         var measured = new List<DialogMeasure>();
@@ -117,14 +121,15 @@ public sealed class SmallDialogGeometryTests
             E2EResults.Record("rects.navigate", navigated && selected, $"navigated={navigated}, selected={selected}.");
             E2EGuards.RequireSandboxSelection(session, sandbox, "rects.sandbox.select");
 
-            measured.Add(OpenAndMeasure(driver, RectsDialogAdd, AddFavoriteIds, classic, () => driver.OpenMenu(MenuFavorites, MenuFavoritesAdd)));
+            measured.Add(OpenAndMeasure(driver, RectsDialogAdd, AddFavoriteIds, classic192, classic144, () => driver.OpenMenu(MenuFavorites, MenuFavoritesAdd)));
             CloseDialog(driver);
 
-            measured.Add(OpenAndMeasure(driver, RectsDialogRemove, RemoveFavoriteIds, classic, () => driver.OpenMenu(MenuFavorites, MenuFavoritesRemove)));
+            measured.Add(OpenAndMeasure(driver, RectsDialogRemove, RemoveFavoriteIds, classic192, classic144, () => driver.OpenMenu(MenuFavorites, MenuFavoritesRemove)));
             CloseDialog(driver);
 
-            measured.Add(OpenAndMeasure(driver, RectsDialogFind, FindIds, classic, () => driver.OpenMenu(MenuEdit, MenuEditFind)));
-            CheckFindNextEnabledState(driver, classic);
+            DialogMeasure find = OpenAndMeasure(driver, RectsDialogFind, FindIds, classic192, classic144, () => driver.OpenMenu(MenuEdit, MenuEditFind));
+            measured.Add(find);
+            CheckFindNextEnabledState(driver, classic192, classic144, find.Dpi);
             CloseDialog(driver);
 
             WriteArtifact(config, measured);
@@ -155,7 +160,8 @@ public sealed class SmallDialogGeometryTests
         EditingDriver driver,
         string name,
         IReadOnlyDictionary<int, string> ids,
-        JsonDocument classic,
+        JsonDocument classic192,
+        JsonDocument classic144,
         Action open)
     {
         open();
@@ -163,14 +169,16 @@ public sealed class SmallDialogGeometryTests
         if (root is null)
         {
             E2EResults.Record("rects." + name + ".open", false, "The dialog did not open.");
-            return new DialogMeasure(name, 0, 0, 0, Array.Empty<ControlMeasure>());
+            return new DialogMeasure(name, 0, null, null, 0, 0, Array.Empty<ControlMeasure>());
         }
 
-        JsonElement expected = ClassicDialog(classic, name);
         IntPtr hwnd = ClassicDialogTests.DialogHandle(root);
         uint dpi = GetDpiForWindow(hwnd);
-        double scale = dpi / (double)ClassicDpi;
-        double tolerance = ToleranceAtClassicDpi * scale;
+        int referenceDpi = dpi == NativeDpi ? NativeDpi : ClassicDpi;
+        double scale = dpi / (double)referenceDpi;
+        double tolerance = ToleranceAtClassicDpi * (dpi / (double)ClassicDpi);
+        JsonDocument reference = ReferenceDocument(classic192, classic144, dpi);
+        JsonElement expected = ClassicDialog(reference, name);
         System.Drawing.Rectangle client = ClientScreen(hwnd);
 
         var controls = new List<ControlMeasure>();
@@ -235,12 +243,12 @@ public sealed class SmallDialogGeometryTests
             $"dpi={dpi}, scale={scale:0.###}, tolerance={tolerance:0.0} px, controls={controls.Count}. " +
             (deviations.Count == 0 ? "All within tolerance." : string.Join("; ", deviations)));
 
-        return new DialogMeasure(name, dpi, client.Width, client.Height, controls);
+        return new DialogMeasure(name, dpi, referenceDpi, scale, client.Width, client.Height, controls);
     }
 
-    private static void CheckFindNextEnabledState(EditingDriver driver, JsonDocument classic)
+    private static void CheckFindNextEnabledState(EditingDriver driver, JsonDocument classic192, JsonDocument classic144, uint dpi)
     {
-        JsonElement expected = ClassicDialog(classic, RectsDialogFind);
+        JsonElement expected = ClassicDialog(ReferenceDocument(classic192, classic144, dpi), RectsDialogFind);
         bool classicEnabled = false;
         foreach (JsonElement control in expected.GetProperty("controls").EnumerateArray())
         {
@@ -291,6 +299,9 @@ public sealed class SmallDialogGeometryTests
         throw new InvalidOperationException($"The classic rectangles file has no dialog '{name}'.");
     }
 
+    private static JsonDocument ReferenceDocument(JsonDocument classic192, JsonDocument classic144, uint dpi) =>
+        dpi == NativeDpi ? classic144 : classic192;
+
     private static string Format(double[] edges) => string.Join(",", edges.Select(edge => edge.ToString("0.0")));
 
     private static void WriteArtifact(E2EConfig config, IReadOnlyList<DialogMeasure> dialogs)
@@ -302,10 +313,18 @@ public sealed class SmallDialogGeometryTests
             schema = 1,
             run = config.RunId,
             classicDpi = ClassicDpi,
+            nativeDpi = NativeDpi,
+            references = new
+            {
+                dpi192 = "docs/parity/oracle/regedit-dialog-rects.json",
+                dpi144 = "docs/parity/oracle/regedit-dialog-rects-144dpi.json",
+            },
             dialogs = dialogs.Select(dialog => new
             {
                 name = dialog.Name,
                 dpi = dialog.Dpi,
+                referenceDpi = dialog.ReferenceDpi,
+                referenceScale = dialog.ReferenceScale is double scale ? Math.Round(scale, 3) : (double?)null,
                 clientPx = new { width = dialog.ClientWidth, height = dialog.ClientHeight },
                 controls = dialog.Controls.Select(control => new
                 {
@@ -345,7 +364,14 @@ public sealed class SmallDialogGeometryTests
 
     private sealed record ControlMeasure(int Id, string AutomationId, double[]? Measured, double[] Expected, double Tolerance, bool Within);
 
-    private sealed record DialogMeasure(string Name, uint Dpi, int ClientWidth, int ClientHeight, IReadOnlyList<ControlMeasure> Controls);
+    private sealed record DialogMeasure(
+        string Name,
+        uint Dpi,
+        int? ReferenceDpi,
+        double? ReferenceScale,
+        int ClientWidth,
+        int ClientHeight,
+        IReadOnlyList<ControlMeasure> Controls);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct ScreenPoint

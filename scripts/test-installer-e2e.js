@@ -70,12 +70,14 @@ const NSIS_SCRIPT = path.join(REPO_ROOT, "installer", "bwc.nsi");
 const OLD_LAYOUT_VERSION = "0.1.99";
 const OLD_LAYOUT_DROPPED_FILE = /^BwcGpedit\./i;
 const OLD_LAYOUT_KEPT_EXES = ["BetterWindowsConfig.exe", "BwcRegedit.exe", "BwcUpdate.exe"];
-// Checks the result must hold and pass, so a run where the old-layout case was skipped or filtered out cannot pass (121).
+// Checks the result must hold and pass, so a run where a required case was skipped or filtered out cannot pass (121, 125, 126).
 const REQUIRED_PROOF_CHECKS = [
   "old.a.noGpeditExe",
   "old.after.shortcuts",
   "old.after.gpedit.starts",
   "old.after.userData",
+  "upfail.filesRestored",
+  "upstale.staleFileGone",
 ];
 const LICENSE_FILE = path.join(REPO_ROOT, "LICENSE");
 const ICON_FILE = path.join(REPO_ROOT, "resources", "bwc.ico");
@@ -415,7 +417,6 @@ function buildInstallerB(rid, version, publishDir, makensis, { oldLayout = false
 
 /** Runs the Installer tests. The result file is the verdict, so a missing or stale file is a failure. */
 function runInstallerTests({ rid, publishA, setupA, setupB, setupOld, versionA, versionB, versionOld, runId }) {
-  rmSync(RESULT_PATH, { force: true });
   const dotnet = dotnetCommand();
   const args = [
     "test",
@@ -512,13 +513,19 @@ function main(argv = process.argv.slice(2)) {
     console.error(usage);
     return EXIT_USAGE;
   }
+  rmSync(options.prepare ? INPUTS_PATH : RESULT_PATH, { force: true });
+
   if (rid === "win-arm64" && process.arch !== "arm64") {
     console.error("An ARM64 app cannot run on this x64 host. Use --rid win-x64.");
     return EXIT_USAGE;
   }
 
   const elevation = elevationState();
-  if (elevation.known && elevation.elevated) {
+  if (!elevation.known) {
+    console.error(`installer-e2e: could not verify that this shell is unelevated: ${elevation.detail}`);
+    return EXIT_USAGE;
+  }
+  if (elevation.elevated) {
     console.error("installer-e2e: run this from an unelevated shell. The Hub must run asInvoker, never elevated.");
     return EXIT_USAGE;
   }
@@ -546,10 +553,6 @@ function main(argv = process.argv.slice(2)) {
   const publishOld = path.join(REPO_ROOT, "publish", `${rid}-e2e-old`);
   const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
   console.log(`installer-e2e: rid=${rid} A=${versionA} B=${versionB} runId=${runId}`);
-
-  if (options.prepare) {
-    rmSync(INPUTS_PATH, { force: true });
-  }
 
   let setupA;
   let setupB;
@@ -597,7 +600,7 @@ function main(argv = process.argv.slice(2)) {
   console.log("");
   console.log(`installer-e2e: ${pass ? "PASS" : "FAIL"} ${rid} ${versionA} -> ${versionB}, old layout ${versionOld} -> ${versionB}`);
   for (const id of missingProof) {
-    console.log(`  MISSING proof check ${id}: the old-layout case did not record it as passed`);
+    console.log(`  MISSING proof check ${id}: a required installer proof case did not record it as passed`);
   }
   console.log(`installer-e2e: ${checks.length - failed.length} of ${checks.length} checks passed`);
   for (const check of failed) {

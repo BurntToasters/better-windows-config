@@ -13,9 +13,9 @@ namespace Bwc.Gpedit;
 /// Loading the model and Refresh, which loads it again (piece G2, docs/failure-modes/gpedit-commands.md, sections 5, 6
 /// and 9). Each load has a token source of its own. It is cancelled and disposed when the next load starts and when the
 /// view closes.
-/// A request while a load is in flight is merged into one more load, and a load that finishes while the setting dialog is
-/// open is dropped, so the model never changes under the dialog. The new model, its tree and the selection replace the old
-/// ones in one step on the UI thread.
+/// A request while a load is in flight is merged into one more load. A load that finishes while any modal is open is held
+/// for a fresh load after the dialog closes, so the model never changes under it. The new model, its tree and the selection
+/// replace the old ones in one step on the UI thread.
 /// </summary>
 public sealed partial class GpeditRootView
 {
@@ -81,17 +81,11 @@ public sealed partial class GpeditRootView
         CancelLoad();
     }
 
-    /// <summary>Refresh: reads the templates and the policy files again. Refused while the setting dialog is open.</summary>
+    /// <summary>Refresh: reads the templates and the policy files again, after any open modal closes.</summary>
     private void RunRefresh()
     {
         if (_closed)
         {
-            return;
-        }
-
-        if (_policyDialog is not null)
-        {
-            Log.Info("Refresh was refused: the setting dialog is open.");
             return;
         }
 
@@ -105,6 +99,18 @@ public sealed partial class GpeditRootView
     /// </summary>
     private void RequestReload()
     {
+        if (_closed)
+        {
+            return;
+        }
+
+        if (_modalBusy)
+        {
+            _reloadPending = true;
+            UpdateReadout();
+            return;
+        }
+
         if (_loadInFlight)
         {
             // The last request wins: the load in flight is cancelled (a reload only) and one more load follows it.
@@ -165,6 +171,13 @@ public sealed partial class GpeditRootView
         }
 
         _loadInFlight = false;
+        if (_modalBusy)
+        {
+            _reloadPending = true;
+            StateChanged();
+            return;
+        }
+
         bool again = _reloadPending;
         _reloadPending = false;
         if (again && _policyDialog is null)

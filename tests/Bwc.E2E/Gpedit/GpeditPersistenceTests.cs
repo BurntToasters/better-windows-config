@@ -194,6 +194,16 @@ public sealed class GpeditPersistenceTests
             run.WriteArtifacts("gpedit-persist-corrupt.png");
         }
 
+        // A map that is null in the file (hand edited): the same as no entry, not a crash at start-up.
+        GpeditSandbox nulls = GpeditSandbox.Create("gpedit-persist-nulls");
+        nulls.SeedStandard();
+        nulls.WriteSettingsFile("""{ "ColumnWidths": null, "Sorts": null, "HiddenColumns": null, "ColumnOrder": null }""");
+        using (GpeditRun run = GpeditRun.Open("gpedit-persist-nulls", nulls))
+        {
+            checks.Record("nullMapsStart", run.Int("Loaded") == 1 && run.NodePath().SequenceEqual([Root]), $"readout='{run.RawReadout()}'.");
+            run.WriteArtifacts("gpedit-persist-nulls.png");
+        }
+
         checks.AssertAllPassed();
     }
 

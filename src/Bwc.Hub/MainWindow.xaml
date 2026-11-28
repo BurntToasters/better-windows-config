@@ -66,9 +66,14 @@
                 BorderBrush="{StaticResource BwcShadowBrush}"
                 BorderThickness="0,1,0,0">
                 <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock
                         x:Name="StatusText"
-                        HorizontalAlignment="Left"
+                        Grid.Column="0"
+                        HorizontalAlignment="Stretch"
                         AutomationProperties.AutomationId="HubStatus"
                         FontFamily="Segoe UI"
                         FontSize="{StaticResource BwcFontSize}"
@@ -76,6 +81,7 @@
                         TextTrimming="CharacterEllipsis" />
                     <TextBlock
                         x:Name="VersionText"
+                        Grid.Column="1"
                         HorizontalAlignment="Right"
                         Margin="12,0,0,0"
                         AutomationProperties.AutomationId="HubVersion"

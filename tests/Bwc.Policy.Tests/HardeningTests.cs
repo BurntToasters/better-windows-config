@@ -258,5 +258,17 @@ public sealed class HardeningTests
         Assert.AreEqual(path, FailureAssert.Single(set, TemplateFailureCode.MalformedXml).FilePath);
     }
 
+    [TestMethod]
+    public void SafeXmlLoad_MissingFile_ReportsUnreadableNotReparsePoint()
+    {
+        using var temp = new TempTemplates();
+        var sink = new FailureSink();
+        var loaded = SafeXml.Load(Path.Combine(temp.Root, "Vanished.admx"), sink);
+        Assert.IsNull(loaded);
+        Assert.AreEqual(1, sink.Items.Count);
+        Assert.AreEqual(TemplateFailureCode.Unreadable, sink.Items[0].Code);
+        Assert.IsTrue(sink.Items[0].Detail.StartsWith("0x", StringComparison.Ordinal));
+    }
+
     private static T Value<T>(T value) => value;
 }

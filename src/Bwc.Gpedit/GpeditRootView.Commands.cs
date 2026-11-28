@@ -86,18 +86,30 @@ public sealed partial class GpeditRootView
     /// <summary>Help: counts the request in the E2E flavor and shows the About box in the ship flavor.</summary>
     private void RunHelp()
     {
-        RecordCommand(CommandHelp);
-        _helpRequests++;
-        UpdateReadout();
+        if (!TryReserveModal())
+        {
+            return;
+        }
+
+        try
+        {
+            RecordCommand(CommandHelp);
+            _helpRequests++;
+            UpdateReadout();
 #if !BWC_E2E
-        ShowHelp();
+            ShowHelp();
 #endif
+        }
+        finally
+        {
+            ReleaseModal();
+        }
     }
 
 #if !BWC_E2E
     private void ShowHelp()
     {
-        if (_helpOpen || _policyDialog is not null || XamlRoot?.ContentIslandEnvironment is not { } environment)
+        if (_helpOpen || !_modalBusy || _closed || XamlRoot?.ContentIslandEnvironment is not { } environment)
         {
             return;
         }
@@ -158,6 +170,11 @@ public sealed partial class GpeditRootView
 
     private void ApplyPopupWidth(IList<MenuFlyoutItemBase> items)
     {
+        ApplyPopupWidth(items, XamlRoot?.RasterizationScale ?? 1.0);
+    }
+
+    private static void ApplyPopupWidth(IList<MenuFlyoutItemBase> items, double scale)
+    {
         var labels = new List<string>();
         var accelerators = new List<string>();
         foreach (MenuFlyoutItemBase entry in items)
@@ -167,20 +184,31 @@ public sealed partial class GpeditRootView
                 labels.Add(leaf.Text ?? string.Empty);
                 accelerators.Add(leaf.KeyboardAcceleratorTextOverride ?? string.Empty);
             }
+            else if (entry is MenuFlyoutSubItem sub)
+            {
+                labels.Add(sub.Text ?? string.Empty);
+                accelerators.Add(string.Empty);
+            }
         }
 
-        double width = ClassicMenuMetrics.PopupItemWidthDip(labels, accelerators, XamlRoot?.RasterizationScale ?? 1.0);
-        if (width <= 0)
-        {
-            return;
-        }
-
+        double width = ClassicMenuMetrics.PopupItemWidthDip(labels, accelerators, scale);
         foreach (MenuFlyoutItemBase entry in items)
         {
-            if (entry is MenuFlyoutItem leaf)
+            if (entry is MenuFlyoutItem or MenuFlyoutSubItem)
             {
-                leaf.MinWidth = width;
+                var element = (FrameworkElement)entry;
+                if (width > 0)
+                {
+                    element.MinWidth = width;
+                }
+
+                ClassicMenuMetrics.ApplyPopupItemHeight(element, scale);
             }
+        }
+
+        foreach (MenuFlyoutSubItem sub in items.OfType<MenuFlyoutSubItem>())
+        {
+            ApplyPopupWidth(sub.Items, scale);
         }
     }
 

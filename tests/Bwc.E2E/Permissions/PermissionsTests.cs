@@ -481,9 +481,8 @@ public sealed class PermissionsTests
 
                 if (advanced != 0)
                 {
-                    // The dialog builds its list header after it appears. Wait for its controls to match the classic set,
-                    // up to 10 s, so the comparison reads the loaded dialog. A set that never matches still fails.
-                    _ = WaitForControlsToMatch(config, "advancedSecuritySettings", advanced, TimeSpan.FromSeconds(10));
+                    // The dialog builds its list header after it appears. Wait for two consecutive complete matches,
+                    // then compare and report that captured snapshot without enumerating the transient tree again.
                     CheckWindowAgainstOracle(config, "advancedSecuritySettings", advanced, "permissions.oracle.advanced");
                     bool inheritedFrom = ContainsText(advanced, InheritedFromText);
                     E2EResults.Record(
@@ -1075,29 +1074,38 @@ public sealed class PermissionsTests
         return count;
     }
 
-    private static bool WaitForControlsToMatch(E2EConfig config, string windowName, nint window, TimeSpan timeout)
-    {
-        (_, List<string> expected) = LoadOracleWindow(config, windowName);
-        return ControlTestSupport.WaitUntil(
-            () =>
-            {
-                (List<string> missing, List<string> extra) = DiffMultisets(expected, ControlSignatures(window));
-                return missing.Count == 0 && extra.Count == 0;
-            },
-            timeout);
-    }
-
     private static void CheckWindowAgainstOracle(E2EConfig config, string windowName, nint window, string prefix)
     {
         (int expectedTabs, List<string> expected) = LoadOracleWindow(config, windowName);
-        List<string> actual = ControlSignatures(window);
-        int tabs = TabCountOf(window);
+        const int timeoutSeconds = 10;
+        int tabs = 0;
+        List<string> actual = [];
+        List<string> missing = [];
+        List<string> extra = [];
+        int consecutiveMatches = 0;
+        bool stable = ControlTestSupport.WaitUntil(
+            () =>
+            {
+                tabs = TabCountOf(window);
+                actual = ControlSignatures(window);
+                (missing, extra) = DiffMultisets(expected, actual);
+                bool matches = tabs == expectedTabs && missing.Count == 0 && extra.Count == 0;
+                consecutiveMatches = matches ? consecutiveMatches + 1 : 0;
+                return consecutiveMatches >= 2;
+            },
+            TimeSpan.FromSeconds(timeoutSeconds));
+        E2EResults.Record(
+            prefix + ".stable",
+            stable,
+            stable
+                ? $"Two consecutive complete snapshots matched within {timeoutSeconds} s."
+                : $"No two consecutive exact snapshots matched within {timeoutSeconds} s; consecutive matches at timeout={consecutiveMatches}; " +
+                  $"last actual tabCount={tabs}, controls={actual.Count}, missing=[{string.Join("; ", missing)}], extra=[{string.Join("; ", extra)}].");
         E2EResults.Record(
             prefix + ".tabs",
             tabs == expectedTabs,
             $"tabCount={tabs}, classic={expectedTabs}.");
 
-        (List<string> missing, List<string> extra) = DiffMultisets(expected, actual);
         E2EResults.Record(
             prefix + ".controls",
             missing.Count == 0 && extra.Count == 0,

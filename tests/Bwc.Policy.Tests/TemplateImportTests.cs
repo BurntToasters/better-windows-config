@@ -351,6 +351,20 @@ public sealed class TemplateImportTests
     }
 
     [TestMethod]
+    public void Remove_DeletesANonEnglishOnlyTemplateWhenUiCultureMatches()
+    {
+        using var box = new TemplateStoreSandbox();
+        var source = box.AddTemplate(box.Folder("src"), "Imp", "T.Imp", culture: "de-DE");
+        var importer = box.Importer();
+        Assert.IsTrue(importer.Import(source, "de-DE").Imported);
+        var removed = importer.Remove("T.Imp", "de-DE");
+        Assert.IsTrue(removed.Removed, string.Join(", ", removed.Problems.Select(p => p.Code)));
+        Assert.AreEqual(2, removed.RemovedPaths.Count);
+        Assert.AreEqual(0, TemplateStoreSandbox.FilesBelow(box.StoreFolder).Count);
+        Assert.IsNull(box.Sources().Load("de-DE").Set.FindFile("T.Imp"));
+    }
+
+    [TestMethod]
     public void Remove_RefusesWhileAnotherImportUsesTheNamespace()
     {
         using var box = new TemplateStoreSandbox();
@@ -368,6 +382,26 @@ public sealed class TemplateImportTests
         Assert.IsTrue(File.Exists(Path.Combine(box.StoreFolder, "Base.admx")));
         Assert.IsTrue(importer.Remove("T.Dep").Removed);
         Assert.IsTrue(importer.Remove("T.Base").Removed);
+    }
+
+    [TestMethod]
+    public void Remove_RefusesWhileANonEnglishOnlyDependentUsesTheNamespace()
+    {
+        using var box = new TemplateStoreSandbox();
+        var folder = box.Folder("src");
+        var baseFile = box.AddTemplate(folder, "Base", "T.Base", culture: "de-DE");
+        var dependent = box.AddTemplate(folder, "Dep", "T.Dep", culture: "de-DE", usings: """<using prefix="b" namespace="T.Base" />""");
+        var importer = box.Importer();
+        Assert.IsTrue(importer.Import(baseFile, "de-DE").Imported);
+        Assert.IsTrue(importer.Import(dependent, "de-DE").Imported);
+        var refused = importer.Remove("T.Base", "de-DE");
+        Assert.IsFalse(refused.Removed);
+        var problem = refused.Problems.Single();
+        Assert.AreEqual(TemplateImportProblemCode.UsedByTemplate, problem.Code);
+        Assert.AreEqual(Path.Combine(box.StoreFolder, "Dep.admx"), problem.Path);
+        Assert.IsTrue(File.Exists(Path.Combine(box.StoreFolder, "Base.admx")));
+        Assert.IsTrue(importer.Remove("T.Dep", "de-DE").Removed);
+        Assert.IsTrue(importer.Remove("T.Base", "de-DE").Removed);
     }
 
     [TestMethod]

@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text;
 using Bwc.E2E.Harness;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -16,8 +18,9 @@ namespace Bwc.E2E.Dialogs;
 ///     <see cref="FaceTolerance"/> on each channel;
 /// (b) each visible static text control has at least <see cref="MinimumContrastPixels"/> pixels inside its
 ///     rectangle whose luminance differs from the text background by more than
-///     <see cref="MinimumLuminanceDifference"/> of full scale. The text background is the most common color
-///     inside that rectangle.
+///     <see cref="MinimumLuminanceDifference"/> of full scale. Named labels use the full ink threshold; a single
+///     punctuation or symbol grapheme uses a positive DPI-scaled ink floor. The text background is the most common
+///     color inside that rectangle.
 /// Invisible text fails (b). A dialog painted in the wrong color fails (a).
 /// </summary>
 internal static class DialogContrast
@@ -25,6 +28,7 @@ internal static class DialogContrast
     internal const int MinimumContrastPixels = 12;
     internal const double MinimumLuminanceDifference = 0.40;
     internal const int FaceTolerance = 6;
+    private const int SymbolInkPixelsAt96Dpi = 2;
 
     /// <summary>COLOR_3DFACE, the classic dialog face on the light palette.</summary>
     private const int Color3DFace = 15;
@@ -81,7 +85,7 @@ internal static class DialogContrast
         List<Rectangle> edits = EditRectangles(window, origin, width, height);
         CheckFace(checkId, pixels, width, height, expectedFace, edits);
         CheckEdits(checkId, pixels, width, edits, expectedFace, expectedWindow);
-        CheckText(checkId, window, pixels, width, height, origin);
+        CheckText(checkId, window, pixels, width, height, origin, GetDpiForWindow(hwnd));
     }
 
     /// <summary>
@@ -187,9 +191,10 @@ internal static class DialogContrast
         int[] pixels,
         int width,
         int height,
-        Point origin)
+        Point origin,
+        uint dpi)
     {
-        List<Rectangle> texts = VisibleTextRectangles(window);
+        List<VisibleTextPeer> texts = VisibleTextRectangles(window);
         if (texts.Count == 0)
         {
             E2EResults.Record(checkId + ".text-contrast", false, "No visible static text control was found in the dialog.");
@@ -198,14 +203,17 @@ internal static class DialogContrast
 
         var problems = new List<string>();
         int leastCount = int.MaxValue;
-        foreach (Rectangle screen in texts)
+        double dpiScale = (dpi == 0 ? 96 : dpi) / 96.0;
+        foreach (VisibleTextPeer peer in texts)
         {
+            int minimum = MinimumInkPixels(peer.Name, dpiScale);
+            Rectangle screen = peer.Bounds;
             Rectangle local = Rectangle.Intersect(
                 new Rectangle(screen.Left - origin.X, screen.Top - origin.Y, screen.Width, screen.Height),
                 new Rectangle(0, 0, width, height));
             if (local.Width <= 0 || local.Height <= 0)
             {
-                problems.Add($"text rectangle {screen} lies outside the client area");
+                problems.Add($"text peer '{peer.Name}' rectangle {screen} lies outside the client area; ink not sampled, minimum {minimum}");
                 leastCount = 0;
                 continue;
             }
@@ -213,23 +221,50 @@ internal static class DialogContrast
             int background = MostCommon(pixels, width, local);
             int count = CountStrongPixels(pixels, width, local, background);
             leastCount = Math.Min(leastCount, count);
-            if (count < MinimumContrastPixels)
+            if (count < minimum)
             {
-                problems.Add($"text rectangle {local.Left},{local.Top},{local.Width}x{local.Height} has {count} strong pixels on {Hex(FromRgb(background))}");
+                problems.Add(
+                    $"text peer '{peer.Name}' rectangle {local.Left},{local.Top},{local.Width}x{local.Height} has {count} strong pixels " +
+                    $"(minimum {minimum}) on {Hex(FromRgb(background))}");
             }
         }
 
         E2EResults.Record(
             checkId + ".text-contrast",
             problems.Count == 0,
-            $"{texts.Count} static text controls, least strong-contrast pixel count {leastCount} (need at least {MinimumContrastPixels}, luminance difference over {MinimumLuminanceDifference:0.00}). " +
+            $"{texts.Count} static text controls at {dpiScale * 96:0} DPI, least strong-contrast pixel count {leastCount} " +
+            $"(named labels need {MinimumContrastPixels}; punctuation/symbol graphemes need a positive scaled floor; " +
+            $"luminance difference over {MinimumLuminanceDifference:0.00}). " +
             (problems.Count == 0 ? "All text is readable." : string.Join("; ", problems)));
     }
 
-    /// <summary>The visible static text rectangles of a window, in screen pixels. Hidden or empty controls skip.</summary>
-    private static List<Rectangle> VisibleTextRectangles(AutomationElement window)
+    private static int MinimumInkPixels(string name, double dpiScale) =>
+        IsSinglePunctuationOrSymbolGrapheme(name)
+            ? Math.Max(1, (int)Math.Ceiling(SymbolInkPixelsAt96Dpi * dpiScale * dpiScale))
+            : MinimumContrastPixels;
+
+    private static bool IsSinglePunctuationOrSymbolGrapheme(string text)
     {
-        var rectangles = new List<Rectangle>();
+        if (StringInfo.ParseCombiningCharacters(text).Length != 1)
+        {
+            return false;
+        }
+
+        foreach (Rune rune in text.EnumerateRunes())
+        {
+            if (Rune.IsPunctuation(rune) || Rune.IsSymbol(rune))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>The visible static text peers of a window, in screen pixels. Hidden or empty controls skip.</summary>
+    private static List<VisibleTextPeer> VisibleTextRectangles(AutomationElement window)
+    {
+        var rectangles = new List<VisibleTextPeer>();
         AutomationElement[] elements = window.FindAllDescendants(
             cf => cf.ByControlType(ControlType.Text).Or(cf.ByControlType(ControlType.Document)));
         foreach (AutomationElement element in elements)
@@ -248,7 +283,7 @@ internal static class DialogContrast
                 Rectangle bounds = element.BoundingRectangle;
                 if (bounds.Width > 0 && bounds.Height > 0)
                 {
-                    rectangles.Add(bounds);
+                    rectangles.Add(new VisibleTextPeer(bounds, name));
                 }
             }
             catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or InvalidOperationException)
@@ -259,6 +294,8 @@ internal static class DialogContrast
 
         return rectangles;
     }
+
+    private readonly record struct VisibleTextPeer(Rectangle Bounds, string Name);
 
     /// <summary>Copies the screen rectangle into an array of 0xRRGGBB values, row by row.</summary>
     private static int[] Capture(IntPtr hwnd, Point origin, int width, int height)
@@ -390,5 +427,8 @@ internal static class DialogContrast
 
     [DllImport("user32.dll")]
     private static extern uint GetSysColor(int index);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hWnd);
 #pragma warning restore SYSLIB1054
 }

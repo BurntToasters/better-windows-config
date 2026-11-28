@@ -342,8 +342,7 @@ internal static class Program
             case UpdateMode.Download:
                 return WriteDownload(UpdateFailure.Unexpected, detail, null, null, null, UnexpectedExitCode);
             case UpdateMode.Apply:
-                var installDir = parsed!.Single("--install-dir");
-                var hubLaunched = installDir is not null && StartHubAfterUnexpected(installDir);
+                var hubLaunched = StartHubAfterUnexpected();
                 return WriteApply(new ApplyOutcome(UpdateFailure.Unexpected, detail, InstallerStarted: false, HubLaunched: hubLaunched), UnexpectedExitCode);
             default:
                 Console.WriteLine(StdoutJson.Simple(UpdateFailure.Unexpected, detail));
@@ -351,14 +350,12 @@ internal static class Program
         }
     }
 
-    private static bool StartHubAfterUnexpected(string installDir)
+    // Never from --install-dir (not validated at this point) and never at the helper's own integrity level (see HubLauncher).
+    private static bool StartHubAfterUnexpected()
     {
         try
         {
-            return new WindowsUpdateProcessHost().StartDetached(
-                Path.Combine(installDir, "BetterWindowsConfig.exe"),
-                ["--update-result", UpdateFailure.Unexpected.ToString()],
-                installDir);
+            return HubLauncher.RelaunchAfterUnexpected(new WindowsUpdateProcessHost());
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception or ArgumentException)
         {

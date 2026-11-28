@@ -467,3 +467,19 @@ The press, the redirect, the helper, the staging folders, the relaunch, and the 
      `ShortcutAumidE2EScope.For` also allows folders below the user profile's temp folder (`%LOCALAPPDATA%\Temp`), which the
      installer's TEMP override does not move. Case 1 now reads the ids after the update too (`update.installed.aumid`), so both
      update paths prove them. Targets, icons, the shortcut set, `BwcGpedit.exe` and the rest of the case passed throughout.
+
+## Audit fixes (0.2.0): upgrade move-out and upgrade rollback (installer.md M68, M69)
+
+Written before the tests and the fix, per AGENTS.md. Both run unelevated in the per-user sandbox.
+
+125. **Failed upgrade wipes the previous version (M69).** `upfail` installs A, hashes every file in the install folder, replaces
+     the last shortcut file with a directory so B fails in `BwcWriteFailed` after `BwcCommit`, and runs B. Required: non-zero
+     exit (`upfail.setup.exit`), no `.new` or `.old` (`upfail.noLeftovers`), Hub exe version still A (`upfail.versionRestored`),
+     `DisplayVersion` still A (`upfail.displayVersion`), and every file of A restored byte for byte (`upfail.filesRestored`).
+     Removing the blocker and rerunning B must succeed (`upfail.rerun.*`). Proof id `upfail.filesRestored` is required in
+     `scripts/test-installer-e2e.js`.
+126. **Stale files from an older manifest stay orphaned after an upgrade (M68).** `upstale` installs A, plants a nested stale
+     file (`stale-old\nested\removed.dat`) listed in `installed-files.txt`, plants an unlisted `user-keep.txt`, and upgrades
+     to B. Required: the stale file is gone (`upstale.staleFileGone`), its empty parent directories are gone (`upstale.staleDirsGone`),
+     the unlisted file remains byte for byte (`upstale.unlistedKept`), and no `.new` or `.old` stays (`upstale.noLeftovers`).
+     Proof id `upstale.staleFileGone` is required in `scripts/test-installer-e2e.js`.

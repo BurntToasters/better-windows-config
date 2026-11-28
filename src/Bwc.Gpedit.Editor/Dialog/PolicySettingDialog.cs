@@ -95,6 +95,7 @@ public sealed class PolicySettingDialog : ClassicDialog
     private bool _closed;
     private bool _optionsDirty;
     private bool _externalDirty;
+    private bool _recoveryDirty;
     private PolicyOptionsView? _options;
     private string _optionsBaseline = string.Empty;
     private double _optionsWidth;
@@ -188,8 +189,8 @@ public sealed class PolicySettingDialog : ClassicDialog
     }
 
     /// <summary>
-    /// Raised after an Apply (or an OK, or a move that applied a
-    /// pending change) succeeded, with the policy applied.
+    /// Raised when Apply, OK or a move wrote policy files, with the target policy. A partial write also raises this event so
+    /// the host can show the files that reached disk, even though the dialog stays open and dirty with the original error.
     /// </summary>
     public event EventHandler<PolicyRef>? Applied;
 
@@ -223,8 +224,14 @@ public sealed class PolicySettingDialog : ClassicDialog
     /// </summary>
     public bool IsReadOnly => _store.IsReadOnly || _snapshot is null;
 
-    /// <summary>True when the state, the comment or an option differs from what was last read or applied.</summary>
-    public bool IsDirty => SelectedState != _baseState || NormalizeLineBreaks(_comment.Text) != _baseComment || _optionsDirty;
+    /// <summary>True when a control differs from the last disk snapshot or the store has incomplete recovery work.</summary>
+    public bool IsDirty => PolicyEditDirtyState.IsDirty(
+        SelectedState,
+        NormalizeLineBreaks(_comment.Text),
+        _optionsDirty,
+        _baseState,
+        _baseComment,
+        _recoveryDirty);
 
     private PolicyState SelectedState =>
         _enabled.IsChecked == true ? PolicyState.Enabled : _disabled.IsChecked == true ? PolicyState.Disabled : PolicyState.NotConfigured;
@@ -317,6 +324,7 @@ public sealed class PolicySettingDialog : ClassicDialog
             _baseComment = ReadComment(current);
             _optionsDirty = false;
             _externalDirty = false;
+            _recoveryDirty = false;
             _notConfigured.IsChecked = _baseState == PolicyState.NotConfigured;
             _enabled.IsChecked = _baseState == PolicyState.Enabled;
             _disabled.IsChecked = _baseState == PolicyState.Disabled;
@@ -351,7 +359,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         };
         _options = new PolicyOptionsView(policy, _optionsPanel, context);
         _options.Load(_snapshot);
-        _options.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly);
+        _options.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly && !_busy);
         _optionsBaseline = _options.Fingerprint();
 
         // A check box or a drop-down reports its own change at once while it loads: that is not an edit.
@@ -413,7 +421,7 @@ public sealed class PolicySettingDialog : ClassicDialog
     {
         if (!_loading)
         {
-            _options?.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly);
+            _options?.SetEnabled(SelectedState == PolicyState.Enabled && !IsReadOnly && !_busy);
             UpdateButtons();
         }
     }
@@ -559,6 +567,13 @@ public sealed class PolicySettingDialog : ClassicDialog
     private void SetBusy(bool busy)
     {
         _busy = busy;
+        bool editable = !busy && !IsReadOnly;
+        _notConfigured.IsEnabled = editable;
+        _enabled.IsEnabled = editable;
+        _disabled.IsEnabled = editable;
+        _comment.IsEnabled = !busy;
+        _comment.IsReadOnly = IsReadOnly;
+        _options?.SetEnabled(editable && SelectedState == PolicyState.Enabled);
         UpdateButtons();
     }
 
@@ -599,6 +614,36 @@ public sealed class PolicySettingDialog : ClassicDialog
         catch (GpoStoreException ex)
         {
             SetBusy(false);
+            if (ex.WrittenFiles.Count > 0)
+            {
+                _recoveryDirty = true;
+                try
+                {
+                    // Keep the pending controls, but compare them with the files that reached disk.
+                    _snapshot = ReadSnapshot(target) ?? _snapshot;
+                    _baseState = _snapshot?.State ?? _baseState;
+                    _baseComment = ReadComment(target);
+                    _options?.Rebase(_snapshot);
+                    _optionsBaseline = _options?.StoredFingerprint() ?? string.Empty;
+                    _optionsDirty = _externalDirty || (_options?.Fingerprint() != _optionsBaseline);
+                }
+                catch (Exception rereadFailure) when (rereadFailure is not OutOfMemoryException)
+                {
+                    UiDiagnostics.Warn?.Invoke($"The setting '{target.Policy.FullName}' could not be rebased after a partial save: {rereadFailure.Message}");
+                }
+
+                UpdateButtons();
+
+                try
+                {
+                    Applied?.Invoke(this, target);
+                }
+                catch (Exception hostFailure) when (hostFailure is not OutOfMemoryException)
+                {
+                    UiDiagnostics.Warn?.Invoke($"The policy list could not be refreshed after a partial save: {hostFailure.Message}");
+                }
+            }
+
             UiDiagnostics.Warn?.Invoke($"The setting '{target.Policy.FullName}' was not saved ({ex.Reason}): {ex.Message}");
             SaveErrorMessage message = SaveErrorMessages.For(ex);
             ShowMessage(DialogStrings.Get("DialogMessageCaption"), message.Text, textId: message.AutomationId);
@@ -626,6 +671,7 @@ public sealed class PolicySettingDialog : ClassicDialog
         _optionsBaseline = _options?.Fingerprint() ?? string.Empty;
         _optionsDirty = false;
         _externalDirty = false;
+        _recoveryDirty = false;
         _applyCount++;
         UpdateButtons();
         Applied?.Invoke(this, target);

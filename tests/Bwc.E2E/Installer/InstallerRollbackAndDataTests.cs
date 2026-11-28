@@ -92,6 +92,36 @@ public sealed partial class InstallerUpdateTests
         RunLinkedLanguageCase(inputs);
     }
 
+    [TestMethod]
+    [TestCategory("Installer")]
+    [TestCategory("E2EOnly")]
+    public void Installer_UpgradeFailure_RollsBackPreviousVersionIntact()
+    {
+        InstallerInputs? inputs = InstallerInputs.TryRead();
+        if (inputs is null)
+        {
+            Assert.Inconclusive("The installer E2E is started by scripts/test-installer-e2e.js.");
+            return;
+        }
+
+        RunUpgradeFailureCase(inputs);
+    }
+
+    [TestMethod]
+    [TestCategory("Installer")]
+    [TestCategory("E2EOnly")]
+    public void Installer_Upgrade_RemovesStaleManifestFilesAndKeepsUnlisted()
+    {
+        InstallerInputs? inputs = InstallerInputs.TryRead();
+        if (inputs is null)
+        {
+            Assert.Inconclusive("The installer E2E is started by scripts/test-installer-e2e.js.");
+            return;
+        }
+
+        RunUpgradeStaleFilesCase(inputs);
+    }
+
     /// <summary>
     /// A folder where the last shortcut file goes makes CreateShortCut fail after the payload is in place, so the first
     /// install rolls back. The install folder must be gone (it held empty payload folders before the fix), and a second
@@ -145,6 +175,139 @@ public sealed partial class InstallerUpdateTests
         finally
         {
             InstallerChecks.Duration("firstfail", stopwatch.ElapsedMilliseconds);
+        }
+
+        AssertNoFailures(start);
+    }
+
+    /// <summary>
+    /// Installs A, blocks a shortcut with a directory so B fails after BwcCommit, and checks that BwcRollback puts every
+    /// file of A back with its original hash and version before a rerun of B succeeds.
+    /// </summary>
+    private static void RunUpgradeFailureCase(InstallerInputs inputs)
+    {
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        RequireFile(inputs.InstallerA);
+        RequireFile(inputs.InstallerB);
+
+        int start = InstallerChecks.Count;
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using InstallerRun run = InstallerRun.Create(config, "upfail");
+            if (InstallSilently(run, inputs.InstallerA, inputs.VersionA, "upfail.a"))
+            {
+                Dictionary<string, string> before = HashTree(run.InstallDir);
+                string blocker = Path.Combine(run.ShortcutDir, InstallerRun.ProductShortcuts[^1].Name);
+                File.Delete(blocker);
+                Directory.CreateDirectory(blocker);
+
+                int exit = run.RunSetup(inputs.InstallerB, SetupTimeout);
+                InstallerChecks.Record(
+                    "upfail.setup.exit",
+                    exit > 0,
+                    $"The failed upgrade exited {exit}; a rolled back upgrade is a non-zero exit (-1 is a timeout).");
+                InstallerChecks.Record(
+                    "upfail.noLeftovers",
+                    !Directory.Exists(run.InstallDir + ".new") && !Directory.Exists(run.InstallDir + ".old"),
+                    "No <install folder>.new or .old stays after the upgrade rollback.");
+                string? exeVersion = InstallerRun.VersionOf(run.HubExe);
+                InstallerChecks.Record(
+                    "upfail.versionRestored",
+                    exeVersion == inputs.VersionA,
+                    $"Restored Hub version is '{exeVersion}', expected '{inputs.VersionA}'.");
+                string? displayVersion = run.ReadUninstallValue("DisplayVersion");
+                InstallerChecks.Record(
+                    "upfail.displayVersion",
+                    displayVersion == inputs.VersionA,
+                    $"Uninstall DisplayVersion is '{displayVersion}', expected '{inputs.VersionA}'.");
+                Dictionary<string, string> after = HashTree(run.InstallDir);
+                bool filesRestored = after.Count == before.Count
+                    && before.All(pair => after.TryGetValue(pair.Key, out string? hash) && hash == pair.Value);
+                InstallerChecks.Record(
+                    "upfail.filesRestored",
+                    filesRestored,
+                    $"{after.Count} of {before.Count} file(s) of version A match SHA-256 after rollback.");
+
+                Directory.Delete(blocker, recursive: true);
+                _ = InstallSilently(run, inputs.InstallerB, inputs.VersionB, "upfail.rerun");
+            }
+        }
+        catch (Exception ex)
+        {
+            InstallerChecks.Record("upfail.exception", false, ex.GetType().Name + ": " + ex.Message);
+        }
+        finally
+        {
+            InstallerChecks.Duration("upfail", stopwatch.ElapsedMilliseconds);
+        }
+
+        AssertNoFailures(start);
+    }
+
+    /// <summary>
+    /// Installs A, records a nested stale file in installed-files.txt plus an unlisted user file, upgrades to B, and
+    /// checks that the listed stale file and its empty parent folders are removed while the unlisted file stays.
+    /// </summary>
+    private static void RunUpgradeStaleFilesCase(InstallerInputs inputs)
+    {
+        E2EConfig config = GuiGate.Config;
+        E2EGuards.RequireE2EOnlyFlavor(config);
+        RequireFile(inputs.InstallerA);
+        RequireFile(inputs.InstallerB);
+
+        int start = InstallerChecks.Count;
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using InstallerRun run = InstallerRun.Create(config, "upstale");
+            if (InstallSilently(run, inputs.InstallerA, inputs.VersionA, "upstale.a"))
+            {
+                string staleRelative = @"stale-old\nested\removed.dat";
+                string staleFile = Path.Combine(run.InstallDir, staleRelative);
+                WriteBytes(staleFile, 128);
+                string manifest = Path.Combine(run.InstallDir, "installed-files.txt");
+                File.AppendAllText(manifest, staleRelative + "\r\n");
+
+                string userFile = Path.Combine(run.InstallDir, "user-keep.txt");
+                WriteBytes(userFile, 128);
+                string userHash = Hash(userFile);
+
+                if (InstallSilently(run, inputs.InstallerB, inputs.VersionB, "upstale.b"))
+                {
+                    InstallerChecks.Record(
+                        "upstale.staleFileGone",
+                        !File.Exists(staleFile),
+                        File.Exists(staleFile)
+                            ? "The stale file listed in the previous manifest was left behind."
+                            : "The stale file listed in the previous manifest was removed.");
+                    bool dirsGone = !Directory.Exists(Path.Combine(run.InstallDir, "stale-old", "nested"))
+                        && !Directory.Exists(Path.Combine(run.InstallDir, "stale-old"));
+                    InstallerChecks.Record(
+                        "upstale.staleDirsGone",
+                        dirsGone,
+                        dirsGone
+                            ? "Empty parent folders of the stale file were removed."
+                            : "An empty parent folder of the stale file was left behind.");
+                    InstallerChecks.Record(
+                        "upstale.unlistedKept",
+                        File.Exists(userFile) && Hash(userFile) == userHash,
+                        "The unlisted file remained with the same SHA-256.");
+                    InstallerChecks.Record(
+                        "upstale.noLeftovers",
+                        !Directory.Exists(run.InstallDir + ".new") && !Directory.Exists(run.InstallDir + ".old"),
+                        "No <install folder>.new or .old stays after the upgrade.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            InstallerChecks.Record("upstale.exception", false, ex.GetType().Name + ": " + ex.Message);
+        }
+        finally
+        {
+            InstallerChecks.Duration("upstale", stopwatch.ElapsedMilliseconds);
         }
 
         AssertNoFailures(start);

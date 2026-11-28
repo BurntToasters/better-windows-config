@@ -134,7 +134,9 @@ public static class ConsoleListExport
             : cell;
 
     private static string CommaCell(string cell) =>
-        cell.Contains(',') || cell.Contains('"') ? "\"" + cell.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : cell;
+        cell.Contains(',') || cell.Contains('"') || cell.Contains('\r') || cell.Contains('\n')
+            ? "\"" + cell.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""
+            : cell;
 
     private static byte[] Encode(string text, bool unicode)
     {

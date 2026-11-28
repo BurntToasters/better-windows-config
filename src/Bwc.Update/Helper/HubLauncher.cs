@@ -13,6 +13,13 @@ public static class HubLauncher
     public const string UpdateResultArgument = "--update-result";
 
     /// <summary>
+    /// The last-resort relaunch of <c>--apply</c> after an unexpected error: the Hub from the helper's own folder with
+    /// <c>--update-result Unexpected</c>. True when a Hub was started.
+    /// </summary>
+    internal static bool RelaunchAfterUnexpected(IUpdateProcessHost host) =>
+        Launch(host, host.HelperDirectory, UpdateFailure.Unexpected).Ok;
+
+    /// <summary>
     /// Returns Success, or <see cref="UpdateFailure.HubMissing"/> (no Hub exe, or the start failed), or
     /// <see cref="UpdateFailure.DeElevationFailed"/> (elevated, no way to start the Hub unelevated).
     /// </summary>

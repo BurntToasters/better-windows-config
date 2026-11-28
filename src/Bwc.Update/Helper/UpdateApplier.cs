@@ -248,10 +248,11 @@ public sealed class UpdateApplier
         Log.Warn($"update not applied: {failure}. {detail}");
         if (!alreadyWaited && request.WaitPids.Count > 0)
         {
-            _ = await WaitForExitAsync(request.WaitPids, request.InstallDir, request.WaitTimeout, CancellationToken.None);
+            // The requested install folder is not trusted here: the refusal may be the very reason it is rejected.
+            _ = await WaitForExitAsync(request.WaitPids, _host.HelperDirectory, request.WaitTimeout, CancellationToken.None);
         }
 
-        if (StartHub(request.InstallDir, failure))
+        if (StartHub(failure))
         {
             return new ApplyOutcome(failure, detail, InstallerStarted: false, HubLaunched: true);
         }
@@ -278,14 +279,21 @@ public sealed class UpdateApplier
         }
     }
 
-    private bool StartHub(string installDir, UpdateFailure failure)
+    // The Hub comes back from the helper's own folder, never from the requested install folder (which may be the reason
+    // for the refusal). An elevated helper starts it at the shell's integrity level so no elevated Hub is left behind.
+    private bool StartHub(UpdateFailure failure)
     {
         try
         {
+            if (_host.IsElevated())
+            {
+                return HubLauncher.Launch(_host, _host.HelperDirectory, failure).Ok;
+            }
+
             return _host.StartDetached(
-                Path.Combine(installDir, HubExecutableName),
+                Path.Combine(_host.HelperDirectory, HubExecutableName),
                 [UpdateResultArgument, failure.ToString()],
-                installDir);
+                _host.HelperDirectory);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or Win32Exception)
         {

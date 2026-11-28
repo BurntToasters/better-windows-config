@@ -21,6 +21,8 @@ internal sealed class CountingRefresher : IPolicyRefresher
 /// </summary>
 internal sealed class GoldenSandbox : IDisposable
 {
+    private Action<GpoWriteEvent>? _writeObserver;
+
     public GoldenSandbox()
     {
         RunRoot = Path.Combine(Path.GetTempPath(), "bwc-policy-golden-" + Guid.NewGuid().ToString("N"));
@@ -32,6 +34,7 @@ internal sealed class GoldenSandbox : IDisposable
             Policy,
             new GpoStoreOptions
             {
+                WriteObserver = e => _writeObserver?.Invoke(e),
                 LockTimeout = TimeSpan.FromSeconds(5),
                 WriteRetryCount = 2,
                 WriteRetryDelay = TimeSpan.FromMilliseconds(10),
@@ -47,6 +50,51 @@ internal sealed class GoldenSandbox : IDisposable
     public CountingRefresher Refresher { get; }
 
     public GpoStore Store { get; }
+
+    /// <summary>Arranges for the next named write to fail after an earlier file has been written.</summary>
+    /// <param name="completedFlatName">The file to wait for, such as <c>Machine.comment.cmtx</c>.</param>
+    /// <param name="blockedFlatName">The file whose write will be refused, such as <c>Machine.Registry.pol</c>.</param>
+    public void FailNextWriteAfter(string completedFlatName, string blockedFlatName)
+    {
+        string completedPath = Path.GetFullPath(PathOf(completedFlatName));
+        _writeObserver = e =>
+        {
+            if (e.Kind != GpoWriteKind.FileWritten || !Path.GetFullPath(e.Path).Equals(completedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            _writeObserver = null;
+            MarkReadOnly(blockedFlatName);
+        };
+    }
+
+    /// <summary>Marks a named file of this sandbox read-only to inject a write failure.</summary>
+    /// <param name="flatName">One of the five GPO files.</param>
+    public void MarkReadOnly(string flatName)
+    {
+        string path = PathOf(flatName);
+        if (!File.Exists(path))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            byte[] initial = flatName == GpoFileNames.GptIniFile
+                ? GptIni.CreateNew().ToBytes()
+                : flatName.EndsWith("." + GpoFileNames.RegistryPol, StringComparison.Ordinal)
+                    ? [0x50, 0x52, 0x65, 0x67, 1, 0, 0, 0]
+                    : [];
+            File.WriteAllBytes(path, initial);
+        }
+
+        File.SetAttributes(path, File.GetAttributes(path) | FileAttributes.ReadOnly);
+    }
+
+    /// <summary>Removes the read-only attribute from a named sandbox file after a fault has been cleared.</summary>
+    /// <param name="flatName">One of the five GPO files.</param>
+    public void AllowWrite(string flatName)
+    {
+        string path = PathOf(flatName);
+        File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+    }
 
     /// <summary>The path of a file of the five, by the flat name a golden step folder uses.</summary>
     /// <param name="flatName">For example the machine registry file as <c>Machine.</c> plus the file name, or

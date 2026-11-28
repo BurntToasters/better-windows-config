@@ -203,8 +203,16 @@ public sealed class ThemeTests
         bool aboveHasFill = SettledBand(hwnd, rowAbove, expected.TreeFocusFill, expectedFill: false);
         Record(caseId, "tree.focusRect.notOnOtherRows", !aboveHasFill, $"The row above the focused row has no selection or focus pixels. Observed {(aboveHasFill ? "fill" : "none")}.");
 
-        CheckPixel(caseId, "tree.background", hwnd, treePaneRect.Left + 380, treePaneRect.Bottom - 20, expected.Window, "Tree background is COLOR_WINDOW.", samples, "treeBackground");
-        CheckPixel(caseId, "list.background", hwnd, listPaneRect.Left + 1200, listPaneRect.Bottom - 60, expected.Window, "List background is COLOR_WINDOW.", samples, "listBackground");
+        Point treeBackgroundPoint = PaneBackgroundPoint(
+            treePaneRect,
+            ControlTestSupport.Rows(session, ControlTestSupport.TreeControl, ControlType.TreeItem),
+            treeRowRect);
+        Point listBackgroundPoint = PaneBackgroundPoint(
+            listPaneRect,
+            ControlTestSupport.Rows(session, ControlTestSupport.ListControl, ControlType.DataItem),
+            Rectangle.Empty);
+        CheckPixel(caseId, "tree.background", hwnd, treeBackgroundPoint.X, treeBackgroundPoint.Y, expected.Window, "Tree background is COLOR_WINDOW.", samples, "treeBackground");
+        CheckPixel(caseId, "list.background", hwnd, listBackgroundPoint.X, listBackgroundPoint.Y, expected.Window, "List background is COLOR_WINDOW.", samples, "listBackground");
         CheckPixel(caseId, "tree.edge", hwnd, treePaneRect.Left + 1, treePaneRect.Top + 200, expected.Window, "The tree pane edge has no system focus rectangle.", samples, "treeEdge");
 
         using (Bitmap treeCapture = CaptureWindow(hwnd, out _))
@@ -401,6 +409,37 @@ public sealed class ThemeTests
         return element is null
             ? System.Drawing.Rectangle.Empty
             : element.BoundingRectangle;
+    }
+
+    private static Point PaneBackgroundPoint(Rectangle paneRect, IEnumerable<AutomationElement> rows, Rectangle avoidRect)
+    {
+        if (paneRect.Width <= 0 || paneRect.Height <= 0)
+        {
+            throw new InvalidOperationException("The UI Automation pane has no client bounds.");
+        }
+
+        int insetX = Math.Max(1, paneRect.Width / 8);
+        int insetY = Math.Max(1, paneRect.Height / 8);
+        int x = paneRect.Right - insetX - 1;
+        int top = paneRect.Top + insetY;
+        int bottom = paneRect.Bottom - insetY - 1;
+        int contentBottom = rows
+            .Select(row => Rectangle.Intersect(row.BoundingRectangle, paneRect))
+            .Where(rect => rect.Width > 0 && rect.Height > 0)
+            .Select(rect => rect.Bottom)
+            .DefaultIfEmpty(paneRect.Top)
+            .Max();
+        int clearStart = Math.Max(top, contentBottom + Math.Max(1, insetY / 2));
+        int y = clearStart <= bottom ? clearStart + ((bottom - clearStart) / 2) : bottom;
+
+        if (!avoidRect.IsEmpty && avoidRect.Contains(x, y))
+        {
+            y = avoidRect.Top - insetY >= top
+                ? avoidRect.Top - insetY
+                : Math.Min(bottom, avoidRect.Bottom + insetY);
+        }
+
+        return new Point(x, y);
     }
 
     /// <summary>

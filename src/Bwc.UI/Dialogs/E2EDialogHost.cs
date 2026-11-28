@@ -95,6 +95,7 @@ internal static class E2EDialogHost
         "literal" => new LiteralDialog(),
         "duplicate" => new DuplicateDialog(),
         "spinner" => new SpinnerDialog(),
+        "unsigned-spinner" => new UnsignedSpinnerDialog(),
         "grid2" => new GridDialog(["Value name", "Value"], [["alpha", "1"], ["beta", "2"]]),
         "grid1" => new GridDialog(["Value"], []),
         _ => throw new ArgumentException("Unknown dialog host scenario '" + scenario + "'."),
@@ -379,6 +380,58 @@ internal static class E2EDialogHost
                     ["value"] = value,
                     ["lastValid"] = spin.Value,
                 };
+            }
+        }
+    }
+
+    /// <summary>Unsigned ranges beyond long.MaxValue, including a full-width step.</summary>
+    private sealed class UnsignedSpinnerDialog : HostDialog
+    {
+        internal UnsignedSpinnerDialog()
+            : base(new ClassicDialogDefinition(
+                "E2E Unsigned Spinner",
+                "E2E host",
+                230,
+                108,
+                [
+                    Label("UnsignedMainLabel", "&Unsigned:", 7, 9, 55, 8),
+                    new(ClassicControlKind.Spinner, 1100, "UnsignedMain", "Unsigned", 65, 7, 150, 12)
+                    {
+                        TabStop = true,
+                        UnsignedMinimum = 0,
+                        UnsignedMaximum = ulong.MaxValue,
+                        UnsignedStep = 1,
+                    },
+                    Label("UnsignedBoundedLabel", "&Bounded:", 7, 27, 55, 8),
+                    new(ClassicControlKind.Spinner, 1101, "UnsignedBounded", "Bounded", 65, 25, 150, 12)
+                    {
+                        TabStop = true,
+                        UnsignedMinimum = (ulong)long.MaxValue + 1,
+                        UnsignedMaximum = ulong.MaxValue,
+                        UnsignedStep = 1,
+                    },
+                    Label("UnsignedLargeStepLabel", "&Large step:", 7, 45, 55, 8),
+                    new(ClassicControlKind.Spinner, 1102, "UnsignedLargeStep", "Large step", 65, 43, 150, 12)
+                    {
+                        TabStop = true,
+                        UnsignedMinimum = 1,
+                        UnsignedMaximum = ulong.MaxValue,
+                        UnsignedStep = ulong.MaxValue,
+                    },
+                    .. OkCancel(118, 87),
+                ]))
+        {
+            RequireControl<ClassicSpinBox>("UnsignedMain").Text = "9223372036854775808";
+            RequireControl<ClassicSpinBox>("UnsignedBounded").Text = "9223372036854775808";
+            RequireControl<ClassicSpinBox>("UnsignedLargeStep").Text = "1";
+        }
+
+        protected override void Describe(Dictionary<string, object?> report)
+        {
+            foreach (string id in new[] { "UnsignedMain", "UnsignedBounded", "UnsignedLargeStep" })
+            {
+                ClassicSpinBox spin = RequireControl<ClassicSpinBox>(id);
+                report[id] = new Dictionary<string, object?> { ["text"] = spin.Text };
             }
         }
     }

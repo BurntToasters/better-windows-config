@@ -234,6 +234,165 @@ public sealed class ElevatedDataTests
     }
 
     [TestMethod]
+    public void RetargetedAncestorJunction_DoesNotRedirectFileCreatesOrAppend()
+    {
+        using var temp = new TempDirectory();
+        string realProfile = Path.Combine(temp.Path, "real-profile");
+        string redirectedProfile = Path.Combine(temp.Path, "redirected-profile");
+        string redirectedTool = Path.Combine(redirectedProfile, "root", Tool);
+        Directory.CreateDirectory(realProfile);
+        Directory.CreateDirectory(redirectedTool);
+        string sentinel = Path.Combine(redirectedTool, "sentinel.txt");
+        File.WriteAllText(sentinel, "redirect target");
+        string[] before = Directory.GetFileSystemEntries(redirectedTool)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray()!;
+
+        string link = Path.Combine(temp.Path, "profile");
+        string root = Path.Combine(link, "root");
+        string toolDir = Path.Combine(root, Tool);
+        string realTool = Path.Combine(realProfile, "root", Tool);
+        try
+        {
+            AssertPathInside(temp.Path, realProfile);
+            AssertPathInside(temp.Path, redirectedProfile);
+            LinkTools.CreateJunction(link, realProfile);
+            AssertJunctionTargetInside(temp.Path, link);
+
+            SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
+            Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
+            Assert.AreEqual(FolderAccess.Ok, access);
+            Assert.AreEqual(Path.GetFullPath(realTool), Path.GetFullPath(folder.FinalPath));
+
+            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+
+            bool ensured = folder.EnsureFile("ensured.txt");
+            bool appended = folder.Append("appended.txt", System.Text.Encoding.UTF8.GetBytes("held folder"));
+            string[] after = Directory.GetFileSystemEntries(redirectedTool)
+                .Select(Path.GetFileName)
+                .Order(StringComparer.Ordinal)
+                .ToArray()!;
+
+            CollectionAssert.AreEqual(before, after, "file creation and append must not create entries in the redirected target.");
+            Assert.AreEqual("redirect target", File.ReadAllText(sentinel));
+            Assert.IsTrue(ensured, "file creation continues in the original held folder.");
+            Assert.IsTrue(appended, "append continues in the original held folder.");
+            Assert.IsTrue(File.Exists(Path.Combine(realTool, "ensured.txt")));
+            Assert.AreEqual("held folder", File.ReadAllText(Path.Combine(realTool, "appended.txt")));
+        }
+        finally
+        {
+            SafeDataFolder.ReleaseAll();
+            RemoveJunctionInside(temp.Path, link);
+        }
+    }
+
+    [TestMethod]
+    public void RetargetedAncestorJunction_EnumerationUsesTheOriginalHeldFolder()
+    {
+        using var temp = new TempDirectory();
+        string realProfile = Path.Combine(temp.Path, "real-profile");
+        string redirectedProfile = Path.Combine(temp.Path, "redirected-profile");
+        string realTool = Path.Combine(realProfile, "root", Tool);
+        string redirectedTool = Path.Combine(redirectedProfile, "root", Tool);
+        Directory.CreateDirectory(realTool);
+        Directory.CreateDirectory(redirectedTool);
+        File.WriteAllText(Path.Combine(realTool, "held.txt"), "held");
+        string sentinel = Path.Combine(redirectedTool, "redirected.txt");
+        File.WriteAllText(sentinel, "redirected");
+        string[] before = Directory.GetFileSystemEntries(redirectedTool)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray()!;
+
+        string link = Path.Combine(temp.Path, "profile");
+        string root = Path.Combine(link, "root");
+        string toolDir = Path.Combine(root, Tool);
+        try
+        {
+            AssertPathInside(temp.Path, realProfile);
+            AssertPathInside(temp.Path, redirectedProfile);
+            LinkTools.CreateJunction(link, realProfile);
+            AssertJunctionTargetInside(temp.Path, link);
+
+            SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
+            Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
+            Assert.AreEqual(FolderAccess.Ok, access);
+            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+
+            string[] names = folder.Names("*.txt").Order(StringComparer.Ordinal).ToArray();
+            string[] after = Directory.GetFileSystemEntries(redirectedTool)
+                .Select(Path.GetFileName)
+                .Order(StringComparer.Ordinal)
+                .ToArray()!;
+
+            CollectionAssert.AreEqual(new[] { "held.txt" }, names, "enumeration must stay in the original held folder.");
+            CollectionAssert.AreEqual(before, after, "enumeration must not change the redirected target.");
+            Assert.AreEqual("redirected", File.ReadAllText(sentinel));
+        }
+        finally
+        {
+            SafeDataFolder.ReleaseAll();
+            RemoveJunctionInside(temp.Path, link);
+        }
+    }
+
+    [TestMethod]
+    public void RetargetedAncestorJunction_ChildCreationStaysInTheOriginalHeldFolder()
+    {
+        using var temp = new TempDirectory();
+        string realProfile = Path.Combine(temp.Path, "real-profile");
+        string redirectedProfile = Path.Combine(temp.Path, "redirected-profile");
+        string redirectedTool = Path.Combine(redirectedProfile, "root", Tool);
+        Directory.CreateDirectory(realProfile);
+        Directory.CreateDirectory(redirectedTool);
+        string sentinel = Path.Combine(redirectedTool, "sentinel.txt");
+        File.WriteAllText(sentinel, "redirect target");
+        string[] before = Directory.GetFileSystemEntries(redirectedTool)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray()!;
+
+        string link = Path.Combine(temp.Path, "profile");
+        string root = Path.Combine(link, "root");
+        string toolDir = Path.Combine(root, Tool);
+        string childPath = Path.Combine(toolDir, "child");
+        string realChild = Path.Combine(realProfile, "root", Tool, "child");
+        try
+        {
+            AssertPathInside(temp.Path, realProfile);
+            AssertPathInside(temp.Path, redirectedProfile);
+            LinkTools.CreateJunction(link, realProfile);
+            AssertJunctionTargetInside(temp.Path, link);
+
+            SafeDataFolder? folder = SafeDataFolder.Acquire(root, toolDir, create: true, out FolderAccess access);
+            Assert.IsNotNull(folder, "the initial relocated profile path should be held.");
+            Assert.AreEqual(FolderAccess.Ok, access);
+            RetargetJunctionInside(temp.Path, link, redirectedProfile);
+
+            SafeDataFolder? child = SafeDataFolder.Acquire(root, childPath, create: true, out FolderAccess childAccess);
+            string[] after = Directory.GetFileSystemEntries(redirectedTool)
+                .Select(Path.GetFileName)
+                .Order(StringComparer.Ordinal)
+                .ToArray()!;
+
+            CollectionAssert.AreEqual(before, after, "child creation must not touch the redirected target.");
+            Assert.AreEqual(FolderAccess.Ok, childAccess);
+            Assert.IsNotNull(child, "child creation continues in the original held folder.");
+            Assert.AreEqual(Path.GetFullPath(childPath), Path.GetFullPath(child.Path), "the public path keeps the requested identity.");
+            Assert.AreEqual(Path.GetFullPath(realChild), Path.GetFullPath(child.FinalPath));
+            Assert.IsTrue(Directory.Exists(realChild));
+            Assert.AreEqual("redirect target", File.ReadAllText(sentinel));
+        }
+        finally
+        {
+            SafeDataFolder.ReleaseAll();
+            RemoveJunctionInside(temp.Path, link);
+        }
+    }
+
+    [TestMethod]
     public void LogDirectoryOutsideTheDataRootIsRefused()
     {
         using var temp = new TempDirectory();
@@ -408,6 +567,47 @@ public sealed class ElevatedDataTests
         Assert.IsTrue(File.Exists(Path.Combine(folder, "settings.json.bad-notes")), "a look-alike name must be left alone.");
         Assert.IsTrue(File.Exists(Path.Combine(folder, "settings.json.bad-20250101T000000Z.keep")));
         Assert.IsTrue(File.Exists(Path.Combine(folder, "settings.json.tmp-abc")));
+    }
+
+    private static void RetargetJunctionInside(string sandbox, string link, string target)
+    {
+        AssertPathInside(sandbox, target);
+        LinkTools.RemoveJunction(link);
+        LinkTools.CreateJunction(link, target);
+        AssertJunctionTargetInside(sandbox, link);
+    }
+
+    private static void RemoveJunctionInside(string sandbox, string link)
+    {
+        if (!Directory.Exists(link))
+        {
+            return;
+        }
+
+        try
+        {
+            AssertJunctionTargetInside(sandbox, link);
+        }
+        finally
+        {
+            LinkTools.RemoveJunction(link);
+        }
+    }
+
+    private static void AssertJunctionTargetInside(string sandbox, string link)
+    {
+        FileSystemInfo? target = new DirectoryInfo(link).ResolveLinkTarget(returnFinalTarget: true);
+        Assert.IsNotNull(target, "the test junction must resolve to a target.");
+        AssertPathInside(sandbox, target.FullName);
+    }
+
+    private static void AssertPathInside(string sandbox, string path)
+    {
+        string root = Path.GetFullPath(sandbox).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string candidate = Path.GetFullPath(path);
+        Assert.IsTrue(
+            candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase),
+            "target must stay inside the test sandbox: " + candidate);
     }
 
     private static SettingsStore<TestSettings> NewStore(string path, string root)

@@ -43,19 +43,24 @@ public sealed partial class GpeditRootView
 
     private void RunOptions()
     {
-        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
+        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner) || !TryReserveModal())
         {
             return;
         }
 
+        _frameDialogOpen = true;
         _ = RunOptionsAsync(owner);
     }
 
     private async Task RunOptionsAsync(nint owner)
     {
-        _frameDialogOpen = true;
         try
         {
+            if (_closed)
+            {
+                return;
+            }
+
             var dialog = new ConsoleOptionsDialog(_options, GpeditStrings.Get("GpeditTitle"));
             if (await dialog.ShowAsync(owner) && dialog.Result is { } result && !_closed)
             {
@@ -74,6 +79,7 @@ public sealed partial class GpeditRootView
         finally
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 
@@ -85,6 +91,11 @@ public sealed partial class GpeditRootView
     /// </summary>
     private void RunWebSite()
     {
+        if (!ModalCommandsAllowed)
+        {
+            return;
+        }
+
         _webSiteRequests++;
         _webSiteUrl = ProjectWebSite;
         if (IsEditorHost)
@@ -131,7 +142,7 @@ public sealed partial class GpeditRootView
     /// </summary>
     private void ShowAboutBox(string applicationName)
     {
-        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner))
+        if (!FrameDialogAllowed || !TryGetOwnerHandle(out nint owner) || !TryReserveModal())
         {
             return;
         }
@@ -140,6 +151,7 @@ public sealed partial class GpeditRootView
         if (!DispatcherQueue.TryEnqueue(() => RunAboutBox(owner, applicationName)))
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 
@@ -147,7 +159,10 @@ public sealed partial class GpeditRootView
     {
         try
         {
-            _ = GpeditAbout.Show(owner, applicationName, Environment.ProcessPath ?? string.Empty);
+            if (!_closed)
+            {
+                _ = GpeditAbout.Show(owner, applicationName, Environment.ProcessPath ?? string.Empty);
+            }
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
@@ -156,6 +171,7 @@ public sealed partial class GpeditRootView
         finally
         {
             _frameDialogOpen = false;
+            ReleaseModal();
         }
     }
 

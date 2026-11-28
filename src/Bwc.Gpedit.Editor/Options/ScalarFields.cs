@@ -121,9 +121,7 @@ internal sealed class NumberField : OptionField
         _label = MakeLabel();
         if (control.Spin != false)
         {
-            long spinMax = (long)Math.Min(_max, long.MaxValue);
-            long spinMin = (long)Math.Min(_min, (ulong)spinMax);
-            long step = (long)Math.Clamp(control.SpinStep ?? 1UL, 1UL, long.MaxValue);
+            ulong step = Math.Max(control.SpinStep ?? 1UL, 1UL);
             ClassicControlDefinition definition = new(
                 ClassicControlKind.Spinner,
                 0,
@@ -134,9 +132,9 @@ internal sealed class NumberField : OptionField
                 OptionsMetrics.Dlu(OptionsMetrics.SpinWidth),
                 OptionsMetrics.Dlu(OptionsMetrics.EditHeight))
             {
-                Minimum = spinMin,
-                Maximum = spinMax,
-                Step = step,
+                UnsignedMinimum = _min,
+                UnsignedMaximum = _max,
+                UnsignedStep = step,
                 LiteralText = true,
             };
             var spin = (ClassicSpinBox)Context.Create(definition);
@@ -199,7 +197,8 @@ internal sealed class NumberField : OptionField
     private static void OnBeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
     {
         string text = args.NewText;
-        if (text.Length > 20 || !text.All(char.IsAsciiDigit))
+        if (text.Length > 20 || !text.All(char.IsAsciiDigit) ||
+            (text.Length > 0 && !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out _)))
         {
             args.Cancel = true;
         }
@@ -243,6 +242,7 @@ internal sealed class ComboField : OptionField
     private readonly TextBlock? _label;
     private readonly ComboBox _combo;
     private readonly List<string> _items;
+    private readonly int _maxLength;
     private TextBox? _inner;
     private string _text = string.Empty;
 
@@ -257,7 +257,7 @@ internal sealed class ComboField : OptionField
             ? [.. control.Suggestions]
             : [.. control.Suggestions.OrderBy(s => s, StringComparer.Create(CultureInfo.CurrentCulture, ignoreCase: true))];
         _combo.ItemsSource = _items;
-        _ = element;
+        _maxLength = (int)Math.Clamp(element.MaxLength ?? OptionsMetrics.DefaultTextMaxLength, 1UL, (ulong)int.MaxValue);
         _combo.Loaded += OnLoaded;
         _combo.TextSubmitted += (_, args) =>
         {
@@ -313,6 +313,7 @@ internal sealed class ComboField : OptionField
         _inner = FindText(_combo);
         if (_inner is not null)
         {
+            _inner.MaxLength = _maxLength;
             _inner.TextChanged += (_, _) => NotifyChanged();
             if (_inner.Text != _text && _text.Length > 0)
             {

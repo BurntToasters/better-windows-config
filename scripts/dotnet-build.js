@@ -11,6 +11,7 @@ import {
   missingRuntimeFiles,
 } from "./flavor-metadata.js";
 import { buildEnvironment } from "./lib/build-environment.js";
+import { captureSourceState, invalidatePublishArtifact, sameCleanSourceState } from "./lib/release-policy.js";
 import { installUpdateOutputs, removeStaleFileLists, updateStagingDir } from "./lib/update-publish.js";
 
 const SCRIPT = "scripts/dotnet-build.js";
@@ -374,6 +375,7 @@ function main(argv = process.argv) {
   const version = readPackageVersion();
   const startedMs = Date.now();
   const startedUtc = new Date(startedMs).toISOString();
+  const sourceStateStart = captureSourceState(REPO_ROOT);
 
   const projects = [];
   const collisions = [];
@@ -383,9 +385,10 @@ function main(argv = process.argv) {
   let flavorCheck = null;
 
   try {
+    invalidatePublishArtifact(artifactFile);
     fs.rmSync(outDir, { recursive: true, force: true });
   } catch (error) {
-    errorMessage = `could not remove ${displayOutDir}: ${error instanceof Error ? error.message : String(error)}`;
+    errorMessage = `could not invalidate the previous build or remove ${displayOutDir}: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   if (!errorMessage) {
@@ -541,11 +544,18 @@ function main(argv = process.argv) {
   }
 
   const pass = errorMessage === null;
+  const sourceStateEnd = captureSourceState(REPO_ROOT);
+  const sourceMatches = sameCleanSourceState(sourceStateStart, sourceStateEnd);
   const artifact = {
     schema: 2,
     version,
     rid,
     flavor,
+    commit: sourceMatches ? sourceStateStart.commit : null,
+    clean: sourceStateStart.clean === true && sourceStateEnd.clean === true,
+    reusable: pass && sourceMatches,
+    sourceStateStart,
+    sourceStateEnd,
     outputDir: displayOutDir,
     startedUtc,
     durationMs: Date.now() - startedMs,

@@ -64,6 +64,7 @@ public sealed class GpeditContextMenuLayoutTests
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("contextlayout", "nodes");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-contextlayout-nodes");
+        sandbox.UseCompactContextMenuTemplates();
         sandbox.SeedStandard();
         using GpeditRun run = GpeditRun.Open("gpedit-contextlayout-nodes", sandbox);
         using var context = new ContextMenuDriver(run.Shell.Session);
@@ -275,6 +276,24 @@ public sealed class GpeditContextMenuLayoutTests
         string where = "context menu on the empty area at " + string.Join(" > ", path);
         run.GoTo(path);
         _ = run.WaitNode(path);
+        if (id.EndsWith(".allSettings", StringComparison.Ordinal))
+        {
+            Rectangle? area = run.Rect(GpeditRun.ListId);
+            GpeditRow[] rows = run.Rows().ToArray();
+            Rectangle[] rowBounds = rows
+                .Select(row => run.RowElement(row.Name)?.BoundingRectangle)
+                .Where(rectangle => rectangle is { IsEmpty: false })
+                .Select(rectangle => rectangle!.Value)
+                .ToArray();
+            bool rowCount = run.NodePath().SequenceEqual(path) && run.Int("Rows") == 2 && rows.Length == 2;
+            bool blankClickBelowRows = area is { } list && rowBounds.Length == 2 && list.Bottom - 8 > rowBounds.Max(rectangle => rectangle.Bottom);
+            checks.Record(id + ".emptyArea.rows", rowCount, $"Node=[{string.Join(" > ", run.NodePath())}], reported rows={run.Int("Rows")}, realized rows={rows.Length}.");
+            checks.Record(
+                id + ".emptyArea.pointBelowRows",
+                blankClickBelowRows,
+                $"The empty-area click y={(area?.Bottom - 8).ToString() ?? "missing"}; row bottoms=[{string.Join(",", rowBounds.Select(rectangle => rectangle.Bottom))}].");
+        }
+
         OpenEmptyAreaMenu(run, context);
         List<GpeditMenuEntry> top = GpeditCommandRun.WaitContextMenu(context);
         int[] topIds = top.Select(e => e.Id).ToArray();

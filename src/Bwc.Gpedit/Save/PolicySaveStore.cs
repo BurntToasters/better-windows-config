@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Bwc.Gpedit.Editor.Dialog;
 using Bwc.Gpo.Comments;
 using Bwc.Gpo.Pol;
@@ -30,7 +31,7 @@ internal sealed class PolicySaveStore : IPolicyEditStore
         _readOnly = readOnly || store is null;
     }
 
-    /// <summary>The files as last read: at the start, or after the last save that wrote something.</summary>
+    /// <summary>The files as last read: at the start, or after a save that wrote files, including a partial failure.</summary>
     internal GpoSnapshot? Snapshot => Volatile.Read(ref _snapshot);
 
     /// <inheritdoc />
@@ -52,17 +53,40 @@ internal sealed class PolicySaveStore : IPolicyEditStore
             throw new InvalidOperationException("The policy object is read-only.");
         }
 
-        PolicySaveOutcome outcome = PolicySave.Save(_store, target.Side, target.Policy, edit, comment);
+        PolicySaveOutcome outcome;
+        try
+        {
+            outcome = PolicySave.Save(_store, target.Side, target.Policy, edit, comment);
+        }
+        catch (GpoStoreException failure) when (failure.WrittenFiles.Count > 0)
+        {
+            try
+            {
+                // There is no rollback: publish the files that reached disk but keep the partial failure and its metadata.
+                Volatile.Write(ref _snapshot, _store.Open());
+            }
+            catch (Exception rereadFailure) when (rereadFailure is not OutOfMemoryException)
+            {
+                Trace.TraceWarning($"The GPO snapshot could not be reread after a partial save: {rereadFailure.Message}");
+            }
+
+            throw;
+        }
+
         if (!outcome.IsValid)
         {
             return new PolicyApplyOutcome(outcome.Problems, false);
         }
 
-        if (outcome.Result is { Wrote: true } result)
+        if (outcome.Result is { } result)
         {
-            // The files were written: the models of the dialog and of the list become what is on disk now.
-            Volatile.Write(ref _snapshot, _store.Open());
-            return new PolicyApplyOutcome([], true, result.RefreshFailure);
+            if (result.Wrote)
+            {
+                // Files were written: the models of the dialog and of the list become what is on disk now.
+                Volatile.Write(ref _snapshot, _store.Open());
+            }
+
+            return new PolicyApplyOutcome([], result.Wrote, result.RefreshFailure);
         }
 
         return new PolicyApplyOutcome([], false);

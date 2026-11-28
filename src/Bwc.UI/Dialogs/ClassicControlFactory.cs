@@ -200,7 +200,25 @@ internal static class ClassicControlFactory
                 break;
 
             case ClassicControlKind.Spinner:
-                var spin = new ClassicSpinBox(definition.Minimum, definition.Maximum, definition.Step, font, styles);
+                bool hasUnsignedRange = definition.UnsignedMinimum.HasValue ||
+                    definition.UnsignedMaximum.HasValue || definition.UnsignedStep.HasValue;
+                ClassicSpinBox spin;
+                if (hasUnsignedRange)
+                {
+                    if (definition.UnsignedMinimum is not ulong unsignedMinimum ||
+                        definition.UnsignedMaximum is not ulong unsignedMaximum ||
+                        definition.UnsignedStep is not ulong unsignedStep)
+                    {
+                        throw new ArgumentException("An unsigned spinner needs a minimum, maximum, and step.", nameof(definition));
+                    }
+
+                    spin = ClassicSpinBox.CreateUnsigned(unsignedMinimum, unsignedMaximum, unsignedStep, font, styles);
+                }
+                else
+                {
+                    spin = new ClassicSpinBox(definition.Minimum, definition.Maximum, definition.Step, font, styles);
+                }
+
                 spin.SetIdentity(definition.AutomationId, name);
                 spin.SetTabStop(definition.TabStop);
                 element = spin;

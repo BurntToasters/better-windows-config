@@ -20,6 +20,8 @@ internal sealed class UpdateFixtureServer : IDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<string, byte[]> _routes = new(StringComparer.Ordinal);
     private readonly Task _accepting;
+    private readonly TaskCompletionSource _firstManifestRequest = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _manifestRequestCount;
     private volatile int _manifestDelayMilliseconds;
     private volatile TaskCompletionSource? _manifestHold;
 
@@ -37,6 +39,31 @@ internal sealed class UpdateFixtureServer : IDisposable
 
     /// <summary>The URL the Hub is pointed at. The signature URL is this URL with .minisig appended.</summary>
     public string ManifestUrl => BaseUrl + ManifestPath;
+
+    public int ManifestRequestCount => Volatile.Read(ref _manifestRequestCount);
+
+    /// <summary>Waits until a Hub check or download asks this fixture for its manifest.</summary>
+    public bool WaitForManifestRequests(int count, TimeSpan timeout)
+    {
+        DateTime deadline = DateTime.UtcNow + timeout;
+        do
+        {
+            if (ManifestRequestCount >= count)
+            {
+                return true;
+            }
+
+            if (!_firstManifestRequest.Task.Wait(TimeSpan.FromMilliseconds(100)))
+            {
+                continue;
+            }
+
+            Thread.Sleep(25);
+        }
+        while (DateTime.UtcNow < deadline);
+
+        return ManifestRequestCount >= count;
+    }
 
     /// <summary>How long the manifest response waits. Zero serves at once.</summary>
     public int ManifestDelayMilliseconds
@@ -144,6 +171,8 @@ internal sealed class UpdateFixtureServer : IDisposable
 
                 if (target == ManifestPath)
                 {
+                    Interlocked.Increment(ref _manifestRequestCount);
+                    _firstManifestRequest.TrySetResult();
                     await WaitForReleaseAsync();
                 }
 

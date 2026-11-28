@@ -52,6 +52,7 @@ integrity); a token that cannot be read counts as elevated.
 | Elevated, a folder from the data root down to the log or settings folder is a junction or symlink | No file log is opened and settings live in memory only. Nothing is created, written, moved, or deleted, and the link target is untouched. |
 | Elevated, the tool folder is replaced by a junction after start | The folders are opened once and held without delete sharing for the process lifetime, so they cannot be renamed or replaced while held. A replacement before the open is the junction case above. |
 | Elevated, the final path of a folder handle is not the expected path | Treated as unsafe, same as a junction. The expected path is the final path of the parent plus the folder name, so a profile relocated by a junction above the data root still works. |
+| Elevated, an ancestor junction is retargeted after the data root is held | Requested-path I/O can create a file (`OpenAlways`, including append) or child (`OpenHeld` via `OpenChild`) in the redirect target before final-path validation refuses, and `Names` enumerates that target. Use the held folder `FinalPath` for file and enumeration I/O and `expectedFinal` for child open/create; operations continue in the original resolved tree and leave the redirected target untouched. A profile junction above the root remains supported when opened before retargeting. |
 | Elevated, the log file (daily or part) is a hard link (link count above 1) or a symlink | That file is not appended to and not deleted; logging stops for the process. |
 | Elevated, the settings file is a hard link or a symlink | The store stops using disk: load returns defaults, save keeps the value in memory, and the file is not read, written, moved, or deleted. |
 | Elevated, the log directory given in `LogOptions` is outside the data root | Treated as unsafe; no file log. |
@@ -256,12 +257,24 @@ trimming and Native AOT cannot remove members that the serializer needs at runti
 ### Identity key construction
 
 The instance key contains the tool id, a short hash of the current user's SID, a short hash of the
-install folder (the full path of the application base directory, case-insensitive) and of `BWC_DATA_ROOT`
-when it is set, and the process integrity level. Copies installed in different folders, or runs with
-different data roots, never forward to each other. If the SID cannot be read, the user name is hashed instead so creation still
+install folder (the full path of the application base directory, case-insensitive), the normalized
+effective `AppPaths.BaseDirectory`, and the process integrity level. The effective root is normalized
+the same way as the install folder, after `AppPaths` has applied its invalid, relative, flavor, and
+elevation rules. Thus an unset root, an ignored relative value, and an explicit default root share one
+scope when they resolve to the same directory. Two accepted data roots remain separate. Ship builds
+running elevated scope the data directory they actually use, even if `BWC_DATA_ROOT` was inherited and
+ignored. Copies installed in different folders, or runs with different effective data roots, never
+forward to each other. If the SID cannot be read, the user name is hashed instead so creation still
 succeeds. If the integrity level query fails, the token `unknown` is used. A failure to query the
 integrity level never makes `Create` throw, and it cannot make two different integrity levels
 share a pipe by accident beyond the explicit `unknown` fallback.
+
+| ID | Failure case | Required result | Probe |
+|----|--------------|-----------------|-------|
+| SI4a | Unset `BWC_DATA_ROOT`, an ignored relative value, or the explicit effective default | Same install folder and effective data root produce the same instance name and scope hash | `SingleInstanceTests.EffectiveDefaultAndIgnoredRootsShareScope` |
+| SI4b | Two different fully qualified roots accepted by `AppPaths` | Their scope hashes and instance names differ | `SingleInstanceTests.DifferentEffectiveRootsHaveDifferentScopesAndEquivalentRootsShare` |
+| SI4c | An elevated ship process inherits a root that `AppPaths` ignores | It shares the per-user effective default scope with an unset root, not a hash of the ignored text | Source review only (the elevated check was not executed) |
+| SI4d | Root normalization changes install-folder, user, integrity, or session boundaries | Install folder, SID, integrity level, and session remain independent identity inputs | Source review of `BuildIdentitySuffix` and the session-suffixed pipe name; existing pipe-name checks |
 
 ### Mutex ownership
 

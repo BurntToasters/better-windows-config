@@ -246,8 +246,8 @@ function printResult(result, verdict = result.pass === true) {
   const checks = Array.isArray(result.checks) ? result.checks : [];
   const notes = Array.isArray(result.notes) ? result.notes : [];
   const knownGaps = Array.isArray(result.knownGaps) ? result.knownGaps : [];
-  const passed = checks.filter((check) => check.pass === true);
-  const failed = checks.filter((check) => check.pass !== true);
+  const passed = checks.filter((check) => check?.pass === true);
+  const failed = checks.filter((check) => check?.pass !== true);
 
   console.log("");
   console.log(`E2E ${verdict ? "PASS" : "FAIL"}`);
@@ -268,7 +268,7 @@ function printResult(result, verdict = result.pass === true) {
   if (failed.length > 0) {
     console.log("failed checks:");
     for (const check of failed) {
-      console.log(`  - ${check.id}: ${String(check.notes ?? "").replace(/\r?\n/g, " ")}`);
+      console.log(`  - ${check?.id ?? "(unknown)"}: ${String(check?.notes ?? "").replace(/\r?\n/g, " ")}`);
     }
   }
 
@@ -324,6 +324,27 @@ if (flavor !== "ship" && flavor !== "e2e") {
   process.exit(2);
 }
 
+// Elevated tests are supported only by the sandboxed E2E flavor. Reject this invalid combination
+// before invalidating result aliases from the last valid invocation.
+const elevatedRun = options.filter !== undefined && ELEVATED_SELECTOR.test(options.filter);
+if (elevatedRun && flavor !== "e2e") {
+  console.error("Elevated tests run only with --flavor e2e.");
+  process.exit(2);
+}
+
+const resultPath = resultPathFor(rid, flavor);
+const fullResultPath = path.join(artifactsDir, `result-${rid}-${flavor}-full.json`);
+const runScope = options.filter === undefined ? "full" : "filtered";
+try {
+  rmSync(resultPath, { force: true });
+  if (runScope === "full") {
+    rmSync(fullResultPath, { force: true });
+  }
+} catch (error) {
+  console.error(`Could not invalidate the previous result artifact: ${error.message}`);
+  process.exit(1);
+}
+
 const testHost = hostPlatform();
 if (testHost === undefined) {
   console.error(`Unsupported process.arch '${process.arch}'. The test host needs arm64 or x64.`);
@@ -331,7 +352,6 @@ if (testHost === undefined) {
   process.exit(2);
 }
 
-const resultPath = resultPathFor(rid, flavor);
 const defaultFolder = flavor === "e2e" ? `${rid}-e2e` : rid;
 const configuredPublish = process.env.BWC_PUBLISH_DIR?.trim();
 const publishDir = configuredPublish
@@ -342,11 +362,6 @@ const runId = `${stamp(new Date())}-${randomBytes(4).toString("hex")}`;
 const runResultPath = runResultPathFor(rid, flavor, runId);
 
 // Elevated tests never run in a process that is not elevated. They report NOT RUN instead.
-const elevatedRun = options.filter !== undefined && ELEVATED_SELECTOR.test(options.filter);
-if (elevatedRun && flavor !== "e2e") {
-  console.error("Elevated tests run only with --flavor e2e.");
-  process.exit(2);
-}
 if (elevatedRun) {
   const elevation = elevationState();
   if (!elevation.known) {
@@ -421,11 +436,32 @@ if (dotnet === undefined) {
   process.exit(1);
 }
 
-try {
-  rmSync(resultPath, { force: true });
-} catch (error) {
-  console.error(`Could not remove the previous result artifact: ${error.message}`);
-  process.exit(1);
+if (flavor === "e2e" && !elevatedRun) {
+  const resourceArgs = [
+    "run",
+    "--project",
+    "tools/Bwc.Oracle.Resources/Bwc.Oracle.Resources.csproj",
+    "-c",
+    "Release",
+    `-p:Platform=${testHost}`,
+    "--",
+    "--out",
+    "docs/parity/oracle",
+  ];
+  console.log("");
+  console.log(`Preparing the classic resource oracle: ${dotnet} ${resourceArgs.join(" ")}`);
+  let resourceRun;
+  try {
+    resourceRun = await runStreaming(dotnet, resourceArgs, { cwd: repoRoot });
+  } catch (error) {
+    console.error(`Could not start the classic resource oracle: ${error.message}`);
+    process.exit(1);
+  }
+
+  if (resourceRun.code !== 0) {
+    console.error(`Classic resource oracle failed with exit code ${resourceRun.code}.`);
+    process.exit(resourceRun.code ?? 1);
+  }
 }
 
 const testArgs = [
@@ -463,7 +499,7 @@ const childEnv = {
   BWC_FLAVOR: flavor,
   BWC_RUN_ID: runId,
   // "full" only when the user gave no --filter. The host writes result-<rid>-<flavor>-full.json for it.
-  BWC_RUN_SCOPE: options.filter === undefined ? "full" : "filtered",
+  BWC_RUN_SCOPE: runScope,
 };
 
 console.log("");
@@ -483,25 +519,40 @@ if (elevatedRun && testRun.code === DOTNET_ZERO_TESTS_EXIT_CODE) {
 
 let result;
 try {
-  result = JSON.parse(readFileSync(resultPath, "utf8"));
+  result = JSON.parse(readFileSync(runResultPath, "utf8"));
 } catch (error) {
-  console.error(`Result artifact is missing or unreadable at ${resultPath}: ${error.message}`);
+  console.error(`Run result artifact is missing or unreadable at ${runResultPath}: ${error.message}`);
   console.error("Test output tail:");
   console.error(tail(testRun.output));
   process.exit(1);
 }
 
-if (result.schema !== 2) {
-  console.error(`Result artifact schema is ${JSON.stringify(result.schema)}, expected 2.`);
+if (result === null || typeof result !== "object" || result.schema !== 2) {
+  console.error(`Result artifact schema is ${JSON.stringify(result?.schema)}, expected 2.`);
   process.exit(1);
 }
 
-printResult(result, testRun.code === 0 && result.pass === true);
+const expectedIdentity = { runId, rid, flavor, scope: runScope };
+const identityMismatches = Object.entries(expectedIdentity)
+  .filter(([field, expected]) => result[field] !== expected)
+  .map(([field, expected]) => `${field}=${JSON.stringify(result[field])} (expected ${JSON.stringify(expected)})`);
+const hasChecks = Array.isArray(result.checks) && result.checks.length > 0;
+const checksPassed = hasChecks && result.checks.every((check) => check?.pass === true);
+const artifactPass = identityMismatches.length === 0 && checksPassed && result.pass === true;
+
+printResult(result, testRun.code === 0 && artifactPass);
+
+if (identityMismatches.length > 0) {
+  console.error("Run result artifact does not match this invocation:");
+  for (const mismatch of identityMismatches) {
+    console.error(`  - ${mismatch}`);
+  }
+}
 
 // The artifact is the evidence. A mismatch with dotnet's exit code means one of them is wrong, so say so.
-if ((testRun.code === 0) !== (result.pass === true)) {
+if ((testRun.code === 0) !== artifactPass) {
   console.error(
-    `MISMATCH: dotnet test exited with code ${testRun.code}, but the artifact has pass=${result.pass}. ` +
+    `MISMATCH: dotnet test exited with code ${testRun.code}, but this run's artifact verdict is ${artifactPass ? "pass" : "fail"} (pass=${result.pass}). ` +
       "Neither result is trusted until the failed checks above are explained.",
   );
 }
@@ -513,6 +564,15 @@ if (testRun.code !== 0) {
 
 if (!Array.isArray(result.checks) || result.checks.length === 0) {
   console.error("Result artifact has no checks. A run with no checks is not evidence.");
+  process.exit(1);
+}
+
+if (!checksPassed) {
+  console.error("Result artifact contains one or more failed checks.");
+  process.exit(1);
+}
+
+if (identityMismatches.length > 0) {
   process.exit(1);
 }
 

@@ -113,20 +113,27 @@ public sealed class MenuTests
         var config = GuiGate.Config;
         var checks = new Checks("menus.bar");
         var oracle = OracleMetrics.Load(config);
+        var metrics = MenuMetrics.Load(config);
         using var session = OpenBwc(config, "menus-bar");
         uint dpi = ControlTestSupport.WindowDpi(session);
         double dipPx = dpi / 96.0;
+        var measuredBar = metrics.MenuBarAtDpi(dpi);
 
         var bar = WaitForElement(session, MenuBarRootId);
         double barHeight = HeightOf(bar);
-        double expectedBar = oracle.DevicePixels(oracle.MenuBarHeight, dpi);
+        double expectedBar = measuredBar is null
+            ? oracle.DevicePixels(oracle.MenuBarHeight, dpi)
+            : measuredBar.HeightPx;
+        string barReference = measuredBar is null
+            ? $"oracle menuBar.height {oracle.MenuBarHeight} at {oracle.CaptureDpi} DPI"
+            : $"measured classic menuBar.height {measuredBar.HeightPx} at {measuredBar.Dpi} DPI";
         checks.Record(
             "height",
             Within(barHeight, expectedBar, dipPx),
-            $"menu bar expected {expectedBar:0.#} px (oracle menuBar.height {oracle.MenuBarHeight} at {oracle.CaptureDpi} DPI), got {barHeight:0.#} px; tolerance one DIP ({dipPx:0.#} px).");
+            $"menu bar expected {expectedBar:0.#} px ({barReference}), got {barHeight:0.#} px; tolerance one DIP ({dipPx:0.#} px).");
 
         var items = TopLevelItems(session);
-        var oracleItems = OracleBarItems(config);
+        var oracleItems = measuredBar?.Items ?? OracleBarItems(config);
         checks.Record(
             "count",
             items.Length == oracleItems.Count,
@@ -144,9 +151,11 @@ public sealed class MenuTests
         {
             var oracleItem = oracleItems[i];
             var rect = items[i].BoundingRectangle;
-            double expectedWidth = oracle.DevicePixels(oracleItem.Width, dpi);
-            double expectedHeight = oracle.DevicePixels(oracleItem.Height, dpi);
-            double expectedOffset = oracle.DevicePixels(oracleItem.X - oracleFirstX, dpi);
+            double expectedWidth = measuredBar is null ? oracle.DevicePixels(oracleItem.Width, dpi) : oracleItem.Width;
+            double expectedHeight = measuredBar is null ? oracle.DevicePixels(oracleItem.Height, dpi) : oracleItem.Height;
+            double expectedOffset = measuredBar is null
+                ? oracle.DevicePixels(oracleItem.X - oracleFirstX, dpi)
+                : oracleItem.X - oracleFirstX;
             double actualOffset = rect.Left - firstLeft;
             checks.Record(
                 $"item{i}.{oracleItem.Text.Replace("&", string.Empty)}",
@@ -548,7 +557,8 @@ public sealed class MenuTests
     {
         uint dpi = ControlTestSupport.WindowDpi(session);
         double dipPx = dpi / 96.0;
-        double expectedItem = metrics.ItemHeightDip * dipPx;
+        double expectedItem = metrics.ItemHeightAtDpi(dpi);
+        string itemHeightReference = metrics.ItemHeightReferenceAtDpi(dpi);
 
         var heights = popup.Items.Select(r => r.Height).ToArray();
         var tops = popup.Items.Select(r => r.Top - popup.Bounds.Top).ToArray();
@@ -559,7 +569,7 @@ public sealed class MenuTests
         checks.Record(
             $"{id}.itemHeight",
             heights.Length > 0 && heights.All(h => Within(h, expectedItem, dipPx)),
-            $"expected every item {expectedItem:0.#} px ({metrics.ItemHeightDip} DIP at {dpi} DPI), got [{string.Join(",", heights.Select(h => h.ToString("0.#")))}] px for {string.Join(", ", popup.Names)}; item tops [{string.Join(",", tops)}] px.");
+            $"expected every item {expectedItem:0.#} px ({itemHeightReference}), got [{string.Join(",", heights.Select(h => h.ToString("0.#")))}] px for {string.Join(", ", popup.Names)}; item tops [{string.Join(",", tops)}] px.");
 
         checks.Record(
             $"{id}.separatorCount",
@@ -1170,6 +1180,7 @@ public sealed class MenuTests
     // ---- oracle -----------------------------------------------------------------------------------
 
     private sealed record OracleBarItem(string Text, int X, int Width, int Height);
+    private sealed record MeasuredMenuBar(int Dpi, int HeightPx, IReadOnlyList<OracleBarItem> Items);
 
     private static List<OracleBarItem> OracleBarItems(E2EConfig config)
     {
@@ -1197,6 +1208,20 @@ public sealed class MenuTests
         public int SeparatorCount { get; init; }
         public double GutterWidthDip { get; init; }
         public double CheckLeftDip { get; init; }
+        public int SupplementalDpi { get; init; }
+        public int SupplementalPopupItemHeightPx { get; init; }
+        public MeasuredMenuBar SupplementalMenuBar { get; init; } = null!;
+
+        public MeasuredMenuBar? MenuBarAtDpi(uint dpi) =>
+            dpi == SupplementalDpi ? SupplementalMenuBar : null;
+
+        public double ItemHeightAtDpi(uint dpi) =>
+            dpi == SupplementalDpi ? SupplementalPopupItemHeightPx : ItemHeightDip * dpi / 96.0;
+
+        public string ItemHeightReferenceAtDpi(uint dpi) =>
+            dpi == SupplementalDpi
+                ? $"measured classic popup row at {dpi} DPI"
+                : $"{ItemHeightDip} DIP at {dpi} DPI";
 
         public static MenuMetrics Load(E2EConfig config)
         {
@@ -1204,6 +1229,16 @@ public sealed class MenuTests
             JsonElement root = document.RootElement;
             JsonElement popup = root.GetProperty("popup");
             JsonElement file = root.GetProperty("popupsMeasured").GetProperty("file");
+            JsonElement supplemental = root.GetProperty("supplementalCaptures").EnumerateArray().First(
+                capture => capture.GetProperty("dpi").GetInt32() == 144);
+            JsonElement supplementalBar = supplemental.GetProperty("menuBar");
+            var supplementalBarItems = supplementalBar.GetProperty("items").EnumerateArray()
+                .Select(item => new OracleBarItem(
+                    item.GetProperty("text").GetString() ?? string.Empty,
+                    item.GetProperty("offsetFromFirstItemPx").GetInt32(),
+                    item.GetProperty("widthPx").GetInt32(),
+                    item.GetProperty("heightPx").GetInt32()))
+                .ToArray();
             return new MenuMetrics
             {
                 ItemHeightDip = popup.GetProperty("itemHeightDip").GetDouble(),
@@ -1212,6 +1247,12 @@ public sealed class MenuTests
                 SeparatorCount = file.GetProperty("separators").GetInt32(),
                 GutterWidthDip = popup.GetProperty("textLeftFromItemEdgeDip").GetDouble(),
                 CheckLeftDip = popup.GetProperty("checkMark").GetProperty("glyphLeftFromItemEdgeDip").GetDouble(),
+                SupplementalDpi = supplemental.GetProperty("dpi").GetInt32(),
+                SupplementalPopupItemHeightPx = supplemental.GetProperty("popup").GetProperty("file").GetProperty("itemHeightPx").GetInt32(),
+                SupplementalMenuBar = new MeasuredMenuBar(
+                    supplemental.GetProperty("dpi").GetInt32(),
+                    supplementalBar.GetProperty("heightPx").GetInt32(),
+                    supplementalBarItems),
             };
         }
     }

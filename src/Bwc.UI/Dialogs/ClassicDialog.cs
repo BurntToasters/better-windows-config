@@ -685,11 +685,22 @@ public class ClassicDialog : ModalDialogWindow
                 return;
 
             case ClassicControlKind.CheckBox when hosted.Element is CheckBox check:
+                // A disabled control takes no access key (read-only policy dialog, placeholder Customize View options).
+                if (!check.IsEnabled)
+                {
+                    return;
+                }
+
                 _ = check.Focus(FocusState.Keyboard);
                 check.IsChecked = check.IsChecked != true;
                 return;
 
             case ClassicControlKind.RadioButton when hosted.Element is RadioButton radio:
+                if (!radio.IsEnabled)
+                {
+                    return;
+                }
+
                 _ = radio.Focus(FocusState.Keyboard);
                 radio.IsChecked = true;
                 return;

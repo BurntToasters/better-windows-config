@@ -57,6 +57,16 @@ Everything here is a decision of this file where the captures are silent. Each o
 - **One reload per closed dialog, only if something changed.** The tree, the list and the model reload once when the dialog closes
   after at least one successful Add or Remove, and not when nothing changed or every attempt was refused. The reload is the Refresh
   command (G2) and keeps the node that is selected.
+- **The caption X and Alt+F4 do not close the dialog while an Add or Remove runs (0.2.0 audit).** Close, Escape and Enter were
+  already ignored while busy, but the caption close was not: the dialog closed under the running operation, the main window was
+  enabled again while the operation still ran, and a refused Add or Remove lost its details box (the dialog was closed, so
+  nothing showed the reason). `IsCloseAllowed` is `!_busy`, as in the policy setting dialog.
+- **The modal reservation starts before the import-store list is read.** Until the Add/Remove dialog is shown and closed, Edit,
+  Filter Options, frame dialogs and Help cannot open another modal. The template continuation keeps the reservation it acquired
+  before `ReadRows` and checks `_closed` after the await, so a close of the editor cannot create a dialog over a closed owner.
+- **Refresh waits until the last modal closes.** A Refresh requested during template preload or any other modal stays queued;
+  a model load that finishes while a modal is open cannot replace the tree under it. After the modal closes, one fresh reload
+  applies the queued request. Closing the editor during preload drops the queued reload.
 - **The dialog lists the store, not the system folder.** The list holds the files of the import store, one row per `.admx` file,
   ordered by file name (ordinal, ignoring case). System templates are never listed and never removable (E1).
 
@@ -68,6 +78,9 @@ Compiled only under `BWC_E2E`, in the style of the other G pieces. The readout i
 | Key | Meaning |
 | --- | --- |
 | `TemplateReloads` | the number of reloads that closing the Add/Remove Templates dialog started (0 until one does) |
+
+The E2E flavor also accepts `BWC_E2E_GPEDIT_TEMPLATE_READ_DELAY_MS` from 0 through 15000. The import dialog test uses it to hold
+the store listing open long enough to exercise other modal entrypoints and a queued Refresh. It is ignored by the ship flavor.
 
 The existing keys carry the rest: `Templates` (loaded template files), `PolicyCount`, `Failures` (engine failures), `Problems` and
 `ProblemList` (every recorded problem; in a clean sandbox run there is none), `Reloading`, `Loaded`, `Node`.
@@ -303,6 +316,22 @@ Problems list (one row each); the sandbox and policy-file problems (kinds `Store
 - The notice and list describe the model before the reload.
 
 Check: `Gpedit_Templates_Notice_ClearsAndReturns` (`removed.list`, `afterReload.list`: the list holds the problems of the last load only); the model swap rule is G2's (`gpedit-commands.md`, Refresh).
+
+## 12. The import-store preload races another modal or a Refresh (A5)
+
+- While Add/Remove Templates is listing the import store, Edit, Filter Options, Add/Remove Columns, File Options or Help opens a
+  second modal owned by the same editor window.
+- The template continuation opens its dialog after the editor was closed while `ReadRows` was awaiting.
+- Refresh during preload or any modal is dropped, or a load finishing during a modal replaces the model under that modal.
+- A queued reload starts before the last modal closes, or more than one queued request starts separate reloads afterward.
+- A modal closes with a pending reload and the editor never applies the latest templates and policy files.
+
+Handling: reserve one modal slot before any asynchronous preparation and keep it until the owning dialog returns. Every modal
+entrypoint checks that slot. Refreshes queue while the slot is reserved; load results that finish meanwhile are held or discarded
+and a fresh coalesced load starts after release. A closed view discards its continuation and queue. The bounded E2E-only read
+delay makes the preload window deterministic. Checks: `Gpedit_Import_Dialog_ModalRace` and
+`Gpedit_Import_Dialog_ClosedDuringPreload` in `tests/Bwc.E2E/Gpedit/Templates/GpeditImportDialogTests.cs`, with the normal
+Gpedit screenshot and JSON artifacts.
 
 ## Decisions and the sources that settle them
 

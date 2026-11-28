@@ -192,6 +192,10 @@ the view restored it.
   one is ignored. Placement is fitted into the work area of the nearest display (the size is reduced, then moved inside). The
   placement is applied after the head's Loaded handler ran (dispatcher, low priority) and only once. Saving is debounced by
   500 ms and runs at window closing; a failure is logged and never thrown.
+- Failure mode (0.2.0 audit): a file that holds `null` for a map (`"ColumnWidths": null` or `"Sorts": null`) makes the JSON reader
+  replace the empty default, and the view iterated the map directly: a `NullReferenceException` in the constructor stopped the
+  window at start-up. Handling: a null map is the same as no entry. Detector: `Gpedit_Persistence_BadSettingsFile` starts
+  with `{ "ColumnWidths": null, "Sorts": null, "HiddenColumns": null, "ColumnOrder": null }`.
 - Detector: `Gpedit_Persistence_Restart` changes the tree width, a column width, the view mode and the tab, moves and resizes the
   window, closes it, starts it again with the same data root and compares; it also checks the root is selected again.
 

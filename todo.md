@@ -24,15 +24,18 @@ Follow `docs/build-setup.md`, section "Toolchain" (the table of tool versions), 
 - Node.js 26.13.1 or newer on the 26 line, and npm 12.2.2 or newer,
 - NSIS 3.10 or newer (`makensis.exe` on PATH, or `NSIS_HOME` set), needed by the installer E2E and
   by the setup build in step 3,
-- the C++ x64 and ARM64 build tools of Visual Studio, because `BwcUpdate.exe` is NativeAOT and the
-  gate compiles both architectures (see `docs/installer.md`, section "Build an installer").
+- Visual Studio Build Tools with the MSVC C++ x64 and ARM64 toolsets, plus a native Windows SDK
+  for the NativeAOT linker (the repository does not pin a minimum SDK version). The x64
+  publish and installer need the x64 toolset; the release VM needs both toolsets to publish both
+  RIDs. The full Visual Studio IDE is optional. `BwcUpdate.exe` is NativeAOT (see
+  `docs/installer.md`, section "Build an installer").
 
 Then, from the repository root:
 
 ```powershell
 git status --short        # must print nothing
 git rev-parse HEAD        # write this commit down
-npm install
+npm install --package-lock=false
 ```
 
 ## 2. Automated runs
@@ -43,15 +46,21 @@ Run these in order from the repository root, unelevated.
 node scripts/test-all.js --rid win-x64
 ```
 
-This is a full gate (no `--quick`). It runs every step in `docs/build-setup.md`, section "Quality
-gate evidence", including `test-policy-release-gate`, then the ship and E2E publish and GUI runs for
-`win-x64`. It takes a long time. If a step fails, the gate stops: note the step name, the summary
-line, and the log named under `artifacts/gate/logs/`, and carry on to the installer E2E only if you
-can, without repeating the gate.
+This is a full local gate (no `--quick`). It builds the solution for both architectures, runs the
+shared non-GUI test projects once on this machine's host architecture, then runs the ship and E2E
+publish and GUI steps for `win-x64`. `test-policy-release-gate` runs last, after the per-RID GUI
+steps. It takes a long time. If a step fails, the gate stops: note the step name, the summary line,
+and the log named under `artifacts/gate/logs/`, and carry on to the installer E2E only if you can,
+without repeating the gate. This run supplies interactive x64 GUI evidence; it is not the release
+VM gate.
 
-Note that a gate for one rid is not release proof. The release needs a `--rid all` gate that passed
-on both architectures (`docs/RELEASE.md`, section "Build, gate, sign, and upload the draft"). This
-run gives the x64 half of the evidence.
+The release VM runs `node scripts/test-all.js --quick --release-gate --rid all` through
+`npm run release:win`, after local interactive GUI E2E evidence has been collected. That VM gate
+builds the solution for both architectures, runs the shared non-GUI test projects once on the host
+architecture, and runs `test-policy-release-gate` last on the host architecture, while skipping the
+per-RID publishes and GUI E2E steps. The release process uses the VM quick gate plus the local GUI
+evidence; a full `--rid all` gate is not required (see `docs/RELEASE.md`, section "Build, gate,
+sign, and upload the draft").
 
 Then the installer E2E, which builds two unsigned E2E installers and checks the in-app update
 between them in a per-user sandbox:

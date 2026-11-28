@@ -367,6 +367,87 @@ public sealed class ClassicDialogAdditionsTests
     [TestMethod]
     [TestCategory("Dialogs")]
     [TestCategory("E2EOnly")]
+    public void Additions_UnsignedSpinnerFullRange()
+    {
+        int start = E2EResults.CheckCount;
+        using Host host = Host.Start("unsigned-spinner");
+        if (!EnsureForeground(host.Hwnd))
+        {
+            Assert.Fail("The unsigned spinner dialog is not the foreground window.");
+        }
+
+        AutomationElement main = host.Driver.WaitForElement("UnsignedMain")!;
+        E2EResults.Record(
+            "additions.unsigned-spinner.automation",
+            main.ControlType == ControlType.Spinner && main.Patterns.RangeValue.IsSupported &&
+                main.Patterns.RangeValue.Pattern.Minimum.Value == 0 &&
+                main.Patterns.RangeValue.Pattern.Maximum.Value == (double)ulong.MaxValue &&
+                main.Patterns.Value.IsSupported && main.Patterns.Value.Pattern.Value == "9223372036854775808",
+            $"type={main.ControlType}, min={main.Patterns.RangeValue.Pattern.Minimum.Value}, max={main.Patterns.RangeValue.Pattern.Maximum.Value}, text='{main.Patterns.Value.Pattern.Value}'.");
+
+        _ = FocusAutomationId(host.Automation, "UnsignedMain.Text");
+        Press(host, VirtualKeyShort.UP);
+        Expect(host, "UnsignedMain", "9223372036854775809", "Up above long.MaxValue");
+        Press(host, VirtualKeyShort.DOWN);
+        Expect(host, "UnsignedMain", "9223372036854775808", "Down above long.MaxValue");
+        SelectAllAndType("18446744073709551615");
+        Press(host, VirtualKeyShort.UP);
+        Expect(host, "UnsignedMain", "18446744073709551615", "Up at ulong.MaxValue stays there");
+        Press(host, VirtualKeyShort.DOWN);
+        Expect(host, "UnsignedMain", "18446744073709551614", "Down from ulong.MaxValue");
+        SelectAllAndType("0");
+        Press(host, VirtualKeyShort.DOWN);
+        Expect(host, "UnsignedMain", "0", "Down at the unsigned minimum stays there");
+
+        _ = FocusAutomationId(host.Automation, "UnsignedBounded.Text");
+        Press(host, VirtualKeyShort.UP);
+        Expect(host, "UnsignedBounded", "9223372036854775809", "Up from the unsigned minimum");
+        Press(host, VirtualKeyShort.DOWN);
+        Expect(host, "UnsignedBounded", "9223372036854775808", "Down to the unsigned minimum");
+        Press(host, VirtualKeyShort.DOWN);
+        Expect(host, "UnsignedBounded", "9223372036854775808", "Down at the unsigned minimum stays there");
+        SelectAllAndType("18446744073709551615");
+        Press(host, VirtualKeyShort.UP);
+        Expect(host, "UnsignedBounded", "18446744073709551615", "Up at the unsigned maximum stays there");
+
+        AutomationElement largeStep = host.Driver.WaitForElement("UnsignedLargeStep")!;
+        E2EResults.Record(
+            "additions.unsigned-spinner.large-step-range",
+            largeStep.Patterns.RangeValue.IsSupported &&
+                largeStep.Patterns.RangeValue.Pattern.Minimum.Value == 1 &&
+                largeStep.Patterns.RangeValue.Pattern.Maximum.Value == (double)ulong.MaxValue &&
+                largeStep.Patterns.RangeValue.Pattern.SmallChange.Value == (double)ulong.MaxValue,
+            $"min={largeStep.Patterns.RangeValue.Pattern.Minimum.Value}, max={largeStep.Patterns.RangeValue.Pattern.Maximum.Value}, step={largeStep.Patterns.RangeValue.Pattern.SmallChange.Value}.");
+        _ = FocusAutomationId(host.Automation, "UnsignedLargeStep.Text");
+        bool upInvoked = host.Driver.Invoke("UnsignedLargeStep.Up");
+        Expect(host, "UnsignedLargeStep", "18446744073709551615", "A ulong-sized step clamps at the maximum");
+        bool upAtMaxInvoked = host.Driver.Invoke("UnsignedLargeStep.Up");
+        Expect(host, "UnsignedLargeStep", "18446744073709551615", "A large step at the maximum stays there");
+        bool downInvoked = host.Driver.Invoke("UnsignedLargeStep.Down");
+        Expect(host, "UnsignedLargeStep", "1", "A large step clamps at the minimum");
+        bool downAtMinInvoked = host.Driver.Invoke("UnsignedLargeStep.Down");
+        Expect(host, "UnsignedLargeStep", "1", "A large step at the minimum stays there");
+        E2EResults.Record(
+            "additions.unsigned-spinner.button-focus",
+            upInvoked && upAtMaxInvoked && downInvoked && downAtMinInvoked && FocusedId(host.Automation) == "UnsignedLargeStep.Text",
+            $"button invocations={upInvoked}/{upAtMaxInvoked}/{downInvoked}/{downAtMinInvoked}; focus='{FocusedId(host.Automation)}'.");
+
+        Press(host, VirtualKeyShort.RETURN);
+        E2EResults.Record("additions.unsigned-spinner.closed", host.Driver.WaitForNoDialog(), "Enter closed the unsigned spinner dialog.");
+        JsonElement report = host.Report();
+        E2EResults.Record(
+            "additions.unsigned-spinner.report",
+            report.GetProperty("accepted").GetBoolean() &&
+                report.GetProperty("UnsignedMain").GetProperty("text").GetString() == "0" &&
+                report.GetProperty("UnsignedBounded").GetProperty("text").GetString() == "18446744073709551615" &&
+                report.GetProperty("UnsignedLargeStep").GetProperty("text").GetString() == "1",
+            $"report={report.GetRawText().Replace(Environment.NewLine, " ")}.");
+        Finish(start, "unsigned spinner");
+    }
+
+    [TestMethod]
+    [TestCategory("Dialogs")]
+    [TestCategory("E2EOnly")]
     public void Additions_EditableGridTwoColumns()
     {
         int start = E2EResults.CheckCount;
@@ -448,6 +529,23 @@ public sealed class ClassicDialogAdditionsTests
         Press(host, VirtualKeyShort.ESCAPE);
         E2EResults.Record("additions.grid2.escape-after-delete", Value(host, 0, 0) == "alpha", $"R0C0='{Value(host, 0, 0)}', expected 'alpha'.");
 
+        // Clearing a two-column row removes it on commit. Focus stays on the following row's first column.
+        Press(host, VirtualKeyShort.RIGHT);
+        ExpectFocus(host, "GridMain.R0C1", "Right moves to the value column before clearing the row");
+        Press(host, VirtualKeyShort.F2);
+        Press(host, VirtualKeyShort.DELETE);
+        Press(host, VirtualKeyShort.RETURN);
+        E2EResults.Record("additions.grid2.clear-value", Value(host, 0, 1) == string.Empty, $"R0C1='{Value(host, 0, 1)}', expected empty.");
+        Press(host, VirtualKeyShort.LEFT);
+        ExpectFocus(host, "GridMain.R0C0", "Left returns to the name column before clearing the row");
+        Press(host, VirtualKeyShort.F2);
+        Press(host, VirtualKeyShort.DELETE);
+        Press(host, VirtualKeyShort.RETURN);
+        E2EResults.Record(
+            "additions.grid2.removed-row-focus",
+            Value(host, 0, 0) == "gamma" && FocusedId(host.Automation) == "GridMain.R0C0" && CellName(host, 1, 0) == "Value name, new row",
+            $"following row value='{Value(host, 0, 0)}', focus='{FocusedId(host.Automation)}', next row name='{CellName(host, 1, 0)}'.");
+
         // Tab leaves the grid.
         Press(host, VirtualKeyShort.TAB);
         ExpectFocus(host, PrimaryId, "Tab leaves the grid for OK");
@@ -457,8 +555,8 @@ public sealed class ClassicDialogAdditionsTests
         string rows = RowsOf(report);
         E2EResults.Record(
             "additions.grid2.report",
-            report.GetProperty("accepted").GetBoolean() && report.GetProperty("columns").GetInt32() == 2 && rows == "alpha|9;gamma|3",
-            $"accepted={report.GetProperty("accepted").GetBoolean()}, rows='{rows}', expected 'alpha|9;gamma|3'.");
+            report.GetProperty("accepted").GetBoolean() && report.GetProperty("columns").GetInt32() == 2 && rows == "gamma|3",
+            $"accepted={report.GetProperty("accepted").GetBoolean()}, rows='{rows}', expected 'gamma|3'.");
         Finish(start, "two column grid");
     }
 

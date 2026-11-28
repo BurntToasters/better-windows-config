@@ -110,6 +110,9 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         }
     }
 
+    /// <summary>A close from the caption or Alt+F4 is refused while an Add or Remove is running.</summary>
+    protected override bool IsCloseAllowed() => !_busy;
+
     // ---- Add ----------------------------------------------------------------------------------------
 
     private void StartAdd()
@@ -154,6 +157,10 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         {
             Log.Warn("An Add of the Add/Remove Templates dialog failed: " + ex.Message);
             _busy = false;
+            if (!_closed)
+            {
+                UpdateButtons();
+            }
         }
     }
 
@@ -183,6 +190,10 @@ internal sealed class GpeditTemplatesDialog : ClassicDialog
         {
             Log.Warn("A Remove of the Add/Remove Templates dialog failed: " + ex.Message);
             _busy = false;
+            if (!_closed)
+            {
+                UpdateButtons();
+            }
         }
     }
 

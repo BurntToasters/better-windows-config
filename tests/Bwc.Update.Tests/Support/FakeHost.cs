@@ -58,9 +58,13 @@ internal sealed class FakeHost : IUpdateProcessHost
     /// <summary>Installer starts of either kind. A refusal leaves this at zero.</summary>
     public int Launched => Runs.Count + ElevatedRuns.Count;
 
+    /// <summary>Told the install folder of each process check, so a test can see which folder the applier looked at.</summary>
+    public Action<string>? LiveFolder { get; set; }
+
     public IReadOnlyList<int> LiveProcesses(IReadOnlyList<int> pids, string installDir)
     {
         Events.Add("live");
+        LiveFolder?.Invoke(installDir);
         return Live(pids);
     }
 

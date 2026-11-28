@@ -110,19 +110,7 @@ internal sealed class ListField : OptionField
 
     internal override ElementValue? Read()
     {
-        List<ListEntry> removed = [];
-        foreach (ListEntry old in _base)
-        {
-            bool kept = _element.ExplicitValue
-                ? _rows.Any(r => string.Equals(r.Name, old.Name, StringComparison.OrdinalIgnoreCase))
-                : _rows.Any(r => string.Equals(r.Data, old.Data, StringComparison.Ordinal));
-            if (!kept)
-            {
-                removed.Add(old);
-            }
-        }
-
-        return new ListValue([.. _rows]) { Removed = removed };
+        return new ListValue([.. _rows]) { Removed = PolicyListEntryRemoval.FindRemoved(_element, _base, _rows) };
     }
 
     internal override void SetEnabled(bool enabled) => _button.IsEnabled = enabled;
@@ -143,7 +131,7 @@ internal sealed class ListField : OptionField
             IReadOnlyList<IReadOnlyList<string>> rows = _rows
                 .Select(r => (IReadOnlyList<string>)(_element.ExplicitValue ? new[] { r.Name ?? string.Empty, r.Data } : new[] { r.Data }))
                 .ToArray();
-            StringComparer comparer = string.IsNullOrEmpty(_element.ValuePrefix) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            StringComparer comparer = _element.ValuePrefix is null ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
             var dialog = new ShowContentsDialog(FieldName, _element.ExplicitValue, rows, comparer);
             bool accepted = await dialog.ShowAsync(Context.OwnerHandle());
             if (accepted && dialog.Result is { } result)

@@ -15,9 +15,10 @@ namespace Bwc.UI.Dialogs;
 
 /// <summary>
 /// The classic numeric up-down: a text box with a column of two spin buttons. Up and Down on the text box and the buttons
-/// change the value by <see cref="Step"/>, clamped to <see cref="Minimum"/> and <see cref="Maximum"/>. Typed text is never
-/// changed: <see cref="Text"/> returns it as typed and <see cref="TryGetValue"/> says whether it is a number in range, so
-/// the caller decides what to do with text that is not (docs/failure-modes/classic-dialog.md, section 14).
+/// change the value by <see cref="Step"/>, clamped to <see cref="Minimum"/> and <see cref="Maximum"/> for signed callers.
+/// The policy-number path keeps an unsigned range and step. Typed text is never changed: <see cref="Text"/> returns it as
+/// typed and <see cref="TryGetValue"/> says whether it fits a signed <see cref="long"/>, so the caller decides what to do
+/// with text that is not (docs/failure-modes/classic-dialog.md, section 14).
 /// </summary>
 public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
 {
@@ -27,7 +28,12 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
     private readonly TextBox _text;
     private readonly RepeatButton _up;
     private readonly RepeatButton _down;
+    private readonly (ulong Minimum, ulong Maximum, ulong Step)? _unsignedRange;
+    private readonly long _minimum;
+    private readonly long _maximum;
+    private readonly long _step;
     private long _lastValid;
+    private ulong _lastUnsignedValid;
 
     /// <param name="minimum">Smallest value.</param>
     /// <param name="maximum">Largest value, at least <paramref name="minimum"/>.</param>
@@ -35,19 +41,58 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
     /// <param name="font">The dialog font.</param>
     /// <param name="styles">The classic dialog styles.</param>
     public ClassicSpinBox(long minimum, long maximum, long step, ClassicFontSpec font, ResourceDictionary styles)
+        : this(minimum, maximum, step, font, styles, null)
+    {
+    }
+
+    /// <summary>Creates the policy-number version of the control, whose bounds and step use the full unsigned range.</summary>
+    internal static ClassicSpinBox CreateUnsigned(
+        ulong minimum,
+        ulong maximum,
+        ulong step,
+        ClassicFontSpec font,
+        ResourceDictionary styles) =>
+        new(0, 0, 1, font, styles, (minimum, maximum, step));
+
+    private ClassicSpinBox(
+        long minimum,
+        long maximum,
+        long step,
+        ClassicFontSpec font,
+        ResourceDictionary styles,
+        (ulong Minimum, ulong Maximum, ulong Step)? unsignedRange)
     {
         ArgumentNullException.ThrowIfNull(styles);
-        if (minimum > maximum)
+        _unsignedRange = unsignedRange;
+        if (unsignedRange is { } range)
         {
-            throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "The minimum is above the maximum.");
+            if (range.Minimum > range.Maximum)
+            {
+                throw new ArgumentOutOfRangeException(nameof(minimum), range.Minimum, "The minimum is above the maximum.");
+            }
+
+            if (range.Step == 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(step), range.Step, "The step must be positive.");
+            }
+
+            _lastValid = 0;
+            _lastUnsignedValid = Math.Clamp(0UL, range.Minimum, range.Maximum);
+        }
+        else
+        {
+            if (minimum > maximum)
+            {
+                throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "The minimum is above the maximum.");
+            }
+
+            ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(step, 0);
+            _lastValid = Math.Clamp(0L, minimum, maximum);
         }
 
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(step, 0);
-
-        Minimum = minimum;
-        Maximum = maximum;
-        Step = step;
-        _lastValid = Math.Clamp(0L, minimum, maximum);
+        _minimum = minimum;
+        _maximum = maximum;
+        _step = step;
 
         _text = new TextBox
         {
@@ -59,7 +104,9 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
             IsSpellCheckEnabled = false,
             IsTextPredictionEnabled = false,
             TextWrapping = TextWrapping.NoWrap,
-            Text = _lastValid.ToString(CultureInfo.InvariantCulture),
+            Text = _unsignedRange is not null
+                ? _lastUnsignedValid.ToString(CultureInfo.InvariantCulture)
+                : _lastValid.ToString(CultureInfo.InvariantCulture),
         };
         Bwc.UI.Menu.TextEditMenu.Attach(_text);
         _text.PreviewKeyDown += OnPreviewKeyDown;
@@ -98,14 +145,22 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
         IsTabStop = false;
     }
 
-    /// <summary>Smallest value.</summary>
-    public long Minimum { get; }
+    /// <summary>Smallest signed value. This property is unavailable for an unsigned policy-number spinner.</summary>
+    public long Minimum => _unsignedRange is null
+        ? _minimum
+        : throw new InvalidOperationException("This spinner uses an unsigned range.");
 
-    /// <summary>Largest value.</summary>
-    public long Maximum { get; }
+    /// <summary>Largest signed value. This property is unavailable for an unsigned policy-number spinner.</summary>
+    public long Maximum => _unsignedRange is null
+        ? _maximum
+        : throw new InvalidOperationException("This spinner uses an unsigned range.");
 
-    /// <summary>Change of one key or button press.</summary>
-    public long Step { get; }
+    /// <summary>
+    /// Signed change of one key or button press. This property is unavailable for an unsigned policy-number spinner.
+    /// </summary>
+    public long Step => _unsignedRange is null
+        ? _step
+        : throw new InvalidOperationException("This spinner uses an unsigned step.");
 
     /// <summary>The text box. Tests and callers that attach their own handlers use it.</summary>
     public TextBox TextBox => _text;
@@ -118,13 +173,35 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
     }
 
     /// <summary>
-    /// The parsed value when the text is a whole number between <see cref="Minimum"/> and <see cref="Maximum"/>, otherwise
-    /// the last valid value. Use <see cref="TryGetValue"/> to tell the two apart.
+    /// The signed value when the text is valid and fits in a <see cref="long"/>, otherwise the last valid signed value. In
+    /// unsigned mode, reading it throws when the value does not fit in a signed long; use <see cref="Text"/> for that path.
+    /// Use <see cref="TryGetValue"/> to distinguish invalid text from a valid signed value.
     /// </summary>
     public long Value
     {
-        get => TryGetValue(out long value) ? value : _lastValid;
-        set => ShowValue(Math.Clamp(value, Minimum, Maximum));
+        get
+        {
+            if (_unsignedRange is not null)
+            {
+                ulong value = TryGetUnsignedValue(out ulong parsed) ? parsed : _lastUnsignedValid;
+                return value <= long.MaxValue
+                    ? (long)value
+                    : throw new InvalidOperationException("The unsigned spinner value does not fit in a signed long.");
+            }
+
+            return TryGetValue(out long signedValue) ? signedValue : _lastValid;
+        }
+        set
+        {
+            if (_unsignedRange is { } range)
+            {
+                ulong unsignedValue = value <= 0 ? 0UL : (ulong)value;
+                ShowUnsignedValue(Math.Clamp(unsignedValue, range.Minimum, range.Maximum));
+                return;
+            }
+
+            ShowValue(Math.Clamp(value, Minimum, Maximum));
+        }
     }
 
     /// <summary>Raised after the text changes, by typing, keys, buttons or <see cref="Text"/>.</summary>
@@ -134,11 +211,25 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
     FrameworkElement IClassicFocusHost.FocusTarget => _text;
 
     /// <summary>
-    /// True and the value when the text is a whole number (optional leading sign, digits) between the minimum and the
-    /// maximum. False for empty, non-numeric or out-of-range text. Never throws.
+    /// True and the value when the text is a whole number (optional leading sign, digits) in the signed range. In unsigned
+    /// mode it is false when the value does not fit in a <see cref="long"/>. False for empty, non-numeric or out-of-range
+    /// text. Never throws.
     /// </summary>
     public bool TryGetValue(out long value)
     {
+        if (_unsignedRange is { } unsignedRange)
+        {
+            if (TryParseUnsigned(Text, out ulong unsignedValue) && unsignedValue <= long.MaxValue &&
+                unsignedValue >= unsignedRange.Minimum && unsignedValue <= unsignedRange.Maximum)
+            {
+                value = (long)unsignedValue;
+                return true;
+            }
+
+            value = 0;
+            return false;
+        }
+
         if (TryParse(Text, out value) && value >= Minimum && value <= Maximum)
         {
             return true;
@@ -153,10 +244,72 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
     /// </summary>
     public void StepBy(int direction)
     {
+        if (_unsignedRange is { } unsignedRange)
+        {
+            ulong currentUnsigned = TryParseUnsigned(Text, out ulong parsedUnsigned) ? parsedUnsigned : _lastUnsignedValid;
+            currentUnsigned = Math.Clamp(currentUnsigned, unsignedRange.Minimum, unsignedRange.Maximum);
+            Int128 unsignedNext = (Int128)currentUnsigned + (direction >= 0 ? (Int128)unsignedRange.Step : -(Int128)unsignedRange.Step);
+            ShowUnsignedValue((ulong)Int128.Clamp(unsignedNext, (Int128)unsignedRange.Minimum, (Int128)unsignedRange.Maximum));
+            return;
+        }
+
         long current = TryParse(Text, out long parsed) ? parsed : _lastValid;
         current = Math.Clamp(current, Minimum, Maximum);
         Int128 next = (Int128)current + (direction >= 0 ? (Int128)Step : -(Int128)Step);
         ShowValue((long)Int128.Clamp(next, Minimum, Maximum));
+    }
+
+    internal bool TryGetUnsignedValue(out ulong value)
+    {
+        if (_unsignedRange is { } range && TryParseUnsigned(Text, out ulong parsed) &&
+            parsed >= range.Minimum && parsed <= range.Maximum)
+        {
+            value = parsed;
+            return true;
+        }
+
+        value = 0;
+        return false;
+    }
+
+    private double AutomationMinimum => _unsignedRange is { } range ? range.Minimum : Minimum;
+
+    private double AutomationMaximum => _unsignedRange is { } range ? range.Maximum : Maximum;
+
+    private double AutomationStep => _unsignedRange is { } range ? range.Step : Step;
+
+    private double AutomationValue => _unsignedRange is not null
+        ? (double)(TryGetUnsignedValue(out ulong value) ? value : _lastUnsignedValid)
+        : Value;
+
+    private void SetAutomationValue(double value)
+    {
+        if (_unsignedRange is not { } range)
+        {
+            Value = (long)Math.Round(value);
+            return;
+        }
+
+        if (!double.IsFinite(value))
+        {
+            throw new OverflowException("The automation value is not finite.");
+        }
+
+        double rounded = Math.Round(value);
+        if (rounded >= (double)range.Maximum)
+        {
+            ShowUnsignedValue(range.Maximum);
+        }
+        else if (rounded <= (double)range.Minimum)
+        {
+            ShowUnsignedValue(range.Minimum);
+        }
+        else
+        {
+            decimal exact = (decimal)rounded;
+            ulong unsignedValue = (ulong)exact;
+            ShowUnsignedValue(Math.Clamp(unsignedValue, range.Minimum, range.Maximum));
+        }
     }
 
     /// <summary>Sets the automation id and name of the control and its parts.</summary>
@@ -224,7 +377,14 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
 
     private void OnTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (TryGetValue(out long value))
+        if (_unsignedRange is not null)
+        {
+            if (TryGetUnsignedValue(out ulong unsignedValue))
+            {
+                _lastUnsignedValid = unsignedValue;
+            }
+        }
+        else if (TryGetValue(out long value))
         {
             _lastValid = value;
         }
@@ -243,8 +403,23 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
         _text.SelectAll();
     }
 
+    private void ShowUnsignedValue(ulong value)
+    {
+        _lastUnsignedValid = value;
+        string text = value.ToString(CultureInfo.InvariantCulture);
+        if (!string.Equals(_text.Text, text, StringComparison.Ordinal))
+        {
+            _text.Text = text;
+        }
+
+        _text.SelectAll();
+    }
+
     private static bool TryParse(string text, out long value) =>
         long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
+
+    private static bool TryParseUnsigned(string text, out ulong value) =>
+        ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
 
     /// <summary>The spin box as UI Automation sees it: a Spinner with a range and a text value.</summary>
     private sealed class ClassicSpinBoxPeer : FrameworkElementAutomationPeer, IRangeValueProvider, IValueProvider
@@ -266,18 +441,18 @@ public sealed class ClassicSpinBox : ContentControl, IClassicFocusHost
 
         bool IRangeValueProvider.IsReadOnly => false;
 
-        double IRangeValueProvider.LargeChange => _owner.Step;
+        double IRangeValueProvider.LargeChange => _owner.AutomationStep;
 
-        double IRangeValueProvider.SmallChange => _owner.Step;
+        double IRangeValueProvider.SmallChange => _owner.AutomationStep;
 
-        double IRangeValueProvider.Maximum => _owner.Maximum;
+        double IRangeValueProvider.Maximum => _owner.AutomationMaximum;
 
-        double IRangeValueProvider.Minimum => _owner.Minimum;
+        double IRangeValueProvider.Minimum => _owner.AutomationMinimum;
 
-        double IRangeValueProvider.Value => _owner.Value;
+        double IRangeValueProvider.Value => _owner.AutomationValue;
 
         // Both providers name SetValue; the overloads differ by parameter type, so one public method serves each.
-        public void SetValue(double value) => _owner.Value = (long)Math.Round(value);
+        public void SetValue(double value) => _owner.SetAutomationValue(value);
 
         bool IValueProvider.IsReadOnly => false;
 

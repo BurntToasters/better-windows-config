@@ -333,6 +333,24 @@ compiled into the Hub) accepts only a plain absolute https URL with a host and n
 |----|---------|--------------------|----------------------|
 | UPD-1 | The manifest's notes link is `http`, `javascript:`, `file:`, relative, empty, has spaces or control characters, or carries user information, and the shell would open it | Nothing opens, or a local file or script runs from the Hub's notes button | `ManifestLocationTests.Notes_Url_*`: each refused text returns false. `UpdateDialogs.OpenNotes` then writes one WARN line ("Release notes link refused ...") and returns without calling `Process.Start` |
 
+## Hub modal serialization and close lifecycle (A6, A8)
+
+Every Hub owned dialog shares one reservation, including About, Update Settings, progress, confirmation,
+message, update available, and `--update-result` windows. A background result waits until the current
+dialog closes. A caller releases its reservation as soon as that dialog closes, before it starts a child
+dialog such as download progress or a save-error message. This keeps the startup/manual-check handover
+single-result behavior while preventing either dialog from re-enabling the owner under another dialog.
+
+| ID | Failure case | Required result | Artifact-based E2E check |
+|----|--------------|-----------------|--------------------------|
+| HM1 | Startup update offer completes while About or Update Settings is open | The existing window remains the only Hub modal; the offer appears once after it closes | `Hub_StartupOfferWaitsForAboutAndSettings` (`hub.modal.*`) |
+| HM2 | `--update-result` arrives while another Hub modal is reserved, or the startup offer is pending | The result waits in order, appears once, and the owner stays disabled until the last dialog closes | `Hub_UpdateResultWaitsForExistingModal` (`hub.modal.result.*`) |
+| HM3 | Startup check completes while a manual check waits on it | Manual progress then one result appear; the startup result is not duplicated and the result can acquire its modal slot after progress closes | `Hub_StartupManualHandoverShowsOneResultAfterProgress` (`hub.modal.handover.*`) |
+| HM4 | A dialog action starts another dialog (install progress followed by a download failure message) | The progress reservation is released before the child message is shown; each dialog completes without deadlock | `Hub_UpdateAvailable_TamperedInstallerIsRefused` (existing artifact-based E2E) |
+| HC1 | Hub closes while a startup check is active | The active check and its helper are canceled, the token source lives until its waiter ends, and no late continuation touches closed controls | `Hub_CloseCancelsStartupCheck` (`hub.close.check.*`) |
+| HC2 | Hub closes during download progress | Download cancellation stops helper work and suppresses late progress/result UI after close | `Hub_CloseCancelsDownloadWork` (`hub.close.download.*`) |
+| HC3 | The accepted install handoff closes the Hub after starting the helper | Shutdown cleanup does not cancel the install helper that was already accepted | `Hub_UpdateAvailable_InstallRunsVerifiedInstaller` (`hub.install.*`) |
+
 ## Single instance race
 
 The first Hub instance creates the named mutex and starts the pipe server. A second instance opens

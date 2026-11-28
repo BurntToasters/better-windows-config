@@ -170,6 +170,7 @@ public sealed class GpeditFilterCommandTests
         E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
         var checks = new GpeditChecks("filter", "contextmenu.list");
         GpeditSandbox sandbox = GpeditSandbox.Create("gpedit-filter-contextmenu-list");
+        sandbox.UseCompactContextMenuTemplates();
         sandbox.SeedStandard();
         using GpeditRun run = GpeditRun.Open("gpedit-filter-contextmenu-list", sandbox);
         using var context = new ContextMenuDriver(run.Shell.Session);
@@ -219,6 +220,27 @@ public sealed class GpeditFilterCommandTests
             // A placeholder page has no list (the tree tests pin that), so its empty area is the page itself.
             Rectangle? list = run.Rect(GpeditRun.ListId) ?? run.Rect("GpeditPlaceholderPage");
             checks.Record(id + ".listFound", list is not null, "the result list or the placeholder page has a rectangle.");
+            if (id == "allSettings")
+            {
+                string[] expectedRows = [MachineFlag, BothFlag];
+                GpeditRow[] rows = run.Rows().ToArray();
+                HashSet<string> rowNames = rows.Select(row => row.Name).ToHashSet(StringComparer.Ordinal);
+                Rectangle[] rowBounds = expectedRows
+                    .Select(name => run.RowElement(name)?.BoundingRectangle)
+                    .Where(rectangle => rectangle is { IsEmpty: false })
+                    .Select(rectangle => rectangle!.Value)
+                    .ToArray();
+                checks.Record(
+                    id + ".selectedNodeAndRows",
+                    run.NodePath().SequenceEqual(path) && run.Int("Rows") == expectedRows.Length && rows.Length == expectedRows.Length && rowNames.SetEquals(expectedRows),
+                    $"Node=[{string.Join(" > ", run.NodePath())}], reported rows={run.Int("Rows")}, realized rows=[{string.Join("|", rows.Select(row => row.Name))}].");
+                bool blankClickBelowRows = list is { } allSettingsList && rowBounds.Length == expectedRows.Length && allSettingsList.Bottom - 8 > rowBounds.Max(rectangle => rectangle.Bottom);
+                checks.Record(
+                    id + ".emptyClickBelowRows",
+                    blankClickBelowRows,
+                    $"The empty-area click y={(list?.Bottom - 8).ToString() ?? "missing"}; row bottoms=[{string.Join(",", rowBounds.Select(rectangle => rectangle.Bottom))}].");
+            }
+
             if (list is { } area)
             {
                 _ = context.RightClick(area.Left + (area.Width / 2), area.Bottom - 8);

@@ -143,6 +143,21 @@ internal static class HubUi
         return false;
     }
 
+    /// <summary>Counts the currently visible top-level windows with a title in the target process.</summary>
+    public static int CountWindowsInProcess(UIA3Automation automation, int processId, string title)
+    {
+        int count = 0;
+        foreach (AutomationElement window in ProcessWindows.Of(automation, processId))
+        {
+            if (IsProcess(window, processId) && string.Equals(SafeName(window), title, StringComparison.Ordinal))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public static string TextOf(AutomationElement element)
     {
         try
@@ -390,9 +405,9 @@ internal static class HubUi
     /// </summary>
     public static string CaptureWindow(IntPtr hwnd, string path)
     {
-        Win32.NativeRect rect = VisibleFrame(hwnd);
-        int width = rect.Right - rect.Left;
-        int height = rect.Bottom - rect.Top;
+        Rectangle rect = CaptureFrameRect(hwnd);
+        int width = rect.Width;
+        int height = rect.Height;
         if (width <= 0 || height <= 0)
         {
             throw new InvalidOperationException($"The captured window has no size ({width}x{height}).");
@@ -412,6 +427,13 @@ internal static class HubUi
         }
 
         return path;
+    }
+
+    /// <summary>The exact screen rectangle used by <see cref="CaptureWindow"/> for the visible-frame capture.</summary>
+    public static Rectangle CaptureFrameRect(IntPtr hwnd)
+    {
+        Win32.NativeRect rect = VisibleFrame(hwnd);
+        return Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
     }
 
     /// <summary>The visible frame of a window in screen pixels, falling back to GetWindowRect when DWM has none.</summary>

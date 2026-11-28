@@ -23,6 +23,9 @@ import {
   malformedInstallerUrls,
   qualityGateProof,
   satisfiesEngineRange,
+  captureSourceState,
+  invalidatePublishArtifact,
+  sameCleanSourceState,
 } from "./lib/release-policy.js";
 import { resolveExecutable, runRestrictedSync } from "./lib/run-restricted.js";
 import { buildPlan } from "./test-all.js";
@@ -2036,22 +2039,109 @@ function runGateProofAndUrlCases(cases) {
   );
 }
 
-/** Publish folder reuse: the build record must match this version and pass, and name HEAD when it names a commit. */
+/** Publish reuse requires a passing, reusable record for the same clean source commit and current clean HEAD. */
 function runPublishReuseCases(temp, cases) {
   const build = path.join(temp, "reuse-build");
   const publish = path.join(temp, "reuse-publish", "win-x64");
-  writeText(path.join(publish, "BetterWindowsConfig.exe"), "exe");
+  const recordPath = path.join(build, "win-x64.json");
+  const exePath = path.join(publish, "BetterWindowsConfig.exe");
+  writeText(exePath, "exe");
+  const cleanHead = { commit: FAKE_COMMIT, clean: true };
+  const unavailableGitState = captureSourceState(temp);
   const reuse = (fields, extra = {}) => {
-    writeJson(path.join(build, "win-x64.json"), { schema: 2, version: VERSION, rid: "win-x64", flavor: "ship", pass: true, ...fields });
-    return publishIsGood({ rid: "win-x64", flavor: "ship", publishDir: publish, buildArtifactDir: build, packageVersion: VERSION, ...extra });
+    writeJson(recordPath, {
+      schema: 2,
+      version: VERSION,
+      rid: "win-x64",
+      flavor: "ship",
+      pass: true,
+      commit: FAKE_COMMIT,
+      clean: true,
+      reusable: true,
+      ...fields,
+    });
+    return publishIsGood({
+      rid: "win-x64",
+      flavor: "ship",
+      publishDir: publish,
+      buildArtifactDir: build,
+      packageVersion: VERSION,
+      sourceState: cleanHead,
+      ...extra,
+    });
   };
-  expectCheck("publish reuse: a passing record for this version is reused", reuse({}) === true, "reused", cases);
+  expectCheck("publish reuse: a passing record for the matching clean commit is reused", reuse({}) === true, "reused", cases);
   expectCheck("publish reuse: a record for another version is not reused", reuse({ version: OTHER_VERSION }) === false, "not reused", cases);
+  expectCheck("publish reuse: a record for another RID is not reused", reuse({ rid: "win-arm64" }) === false, "not reused", cases);
+  expectCheck("publish reuse: a record for another flavor is not reused", reuse({ flavor: "e2e" }) === false, "not reused", cases);
   expectCheck("publish reuse: a failed record is not reused", reuse({ pass: false }) === false, "not reused", cases);
-  expectCheck("publish reuse: a record naming HEAD is reused", reuse({ commit: FAKE_COMMIT }, { head: FAKE_COMMIT }) === true, "reused", cases);
   expectCheck(
-    "publish reuse: a record naming another commit is not reused",
-    reuse({ commit: FAKE_COMMIT }, { head: "f".repeat(40) }) === false,
+    "publish reuse: a legacy record without a commit is not reused",
+    reuse({ commit: undefined }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck("publish reuse: a record naming another commit is not reused", reuse({ commit: "f".repeat(40) }) === false, "not reused", cases);
+  expectCheck(
+    "publish reuse: a clean build for another current HEAD is not reused",
+    reuse({}, { sourceState: { commit: "f".repeat(40), clean: true } }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck("publish reuse: a dirty build record is not reused", reuse({ clean: false, reusable: false }) === false, "not reused", cases);
+  expectCheck("publish reuse: a non-reusable record is not reused", reuse({ reusable: false }) === false, "not reused", cases);
+  expectCheck(
+    "publish reuse: a dirty current checkout is not reused",
+    reuse({}, { sourceState: { commit: FAKE_COMMIT, clean: false } }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck(
+    "publish reuse: an unavailable git state cannot prove a clean source identity",
+    unavailableGitState.commit === null && unavailableGitState.clean === null,
+    JSON.stringify(unavailableGitState),
+    cases,
+  );
+  expectCheck(
+    "publish reuse: a record is not reused when git state is unavailable",
+    reuse({}, { sourceState: unavailableGitState }) === false,
+    "not reused",
+    cases,
+  );
+  expectCheck(
+    "publish reuse: a missing publish executable is not reused",
+    (() => {
+      fs.rmSync(exePath, { force: true });
+      const result = reuse({});
+      writeText(exePath, "exe");
+      return result === false;
+    })(),
+    "not reused",
+    cases,
+  );
+
+  expectCheck(
+    "publish reuse: source state is reusable only for the same clean commit at both ends",
+    sameCleanSourceState(cleanHead, cleanHead) &&
+      !sameCleanSourceState(cleanHead, { commit: "f".repeat(40), clean: true }) &&
+      !sameCleanSourceState({ commit: FAKE_COMMIT, clean: false }, cleanHead) &&
+      !sameCleanSourceState(cleanHead, { commit: FAKE_COMMIT, clean: false }),
+    "commit or clean state changed",
+    cases,
+  );
+
+  reuse({});
+  invalidatePublishArtifact(recordPath);
+  expectCheck(
+    "publish reuse: a publish interrupted after record invalidation cannot leave the old success reusable",
+    publishIsGood({
+      rid: "win-x64",
+      flavor: "ship",
+      publishDir: publish,
+      buildArtifactDir: build,
+      packageVersion: VERSION,
+      sourceState: cleanHead,
+    }) === false,
     "not reused",
     cases,
   );
@@ -2115,7 +2205,7 @@ async function runRestrictedLaunchCases(cases) {
  * D1, D2, D3, D5, D7: synchronous restricted launcher (`scripts/lib/run-restricted.js`) and
  * `test-all.js --quick --release-gate` plan checks.
  */
-function runRestrictedSyncAndGatePlanCases(cases) {
+function runRestrictedSyncAndGatePlanCases(temp, cases) {
   const node = process.execPath;
   const tricky = ["a b", 'q"x', "tr\\", "end\\\\", "", "uni \u00e9", '--flag="v w"'];
   const ok = runRestrictedSync(node, ["-e", "console.log(JSON.stringify(process.argv.slice(1)))", ...tricky], { timeoutMs: 60_000 });
@@ -2180,6 +2270,42 @@ function runRestrictedSyncAndGatePlanCases(cases) {
     `releaseGate=${quickReleasePlan.steps.length}, plainQuick=${plainQuickPlan.steps.length}`,
     cases,
   );
+
+  const psExe = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const probeScript = [
+    "$ErrorActionPreference = 'Stop'",
+    "$id = [Security.Principal.WindowsIdentity]::GetCurrent()",
+    "$psi = New-Object Diagnostics.ProcessStartInfo",
+    `$psi.FileName = '${node.replace(/'/g, "''")}'`,
+    "$psi.Arguments = '-e setTimeout(()=>{},400)'",
+    "$psi.UseShellExecute = $false",
+    "$psi.CreateNoWindow = $true",
+    "$child = [Diagnostics.Process]::Start($psi)",
+    "$byId = [Diagnostics.Process]::GetProcessById($child.Id)",
+    "$child.WaitForExit()",
+    "[Console]::Out.Write($id.User.Value + '|' + $id.Owner.Value + '|' + $child.ExitCode + '|' + ($byId.Id -eq $child.Id))",
+  ].join("; ");
+  const encodedProbe = Buffer.from(probeScript, "utf16le").toString("base64");
+  const nodeDriver =
+    "const {spawnSync}=require('node:child_process');" +
+    "const r=spawnSync(process.argv[1],['-NoProfile','-NonInteractive','-EncodedCommand',process.argv[2]],{encoding:'utf8',windowsHide:true});" +
+    "if(r.status!==0){process.stderr.write(String(r.stderr||r.error||r.status));process.exit(9);}" +
+    "process.stdout.write(r.stdout);";
+  const daclProbe = runRestrictedSync(node, ["-e", nodeDriver, psExe, encodedProbe], { timeoutMs: 60_000 });
+  const probeText = daclProbe.stdout.trim();
+  const parts = probeText.split("|");
+  expectCheck(
+    "C28/D8 restricted token sets TokenOwner to user SID and allows CREATE_NO_WINDOW grandchild + Process.GetProcessById",
+    daclProbe.ok === true &&
+      daclProbe.status === 0 &&
+      parts.length === 4 &&
+      parts[0].startsWith("S-1-5-") &&
+      parts[0] === parts[1] &&
+      parts[2] === "0" &&
+      parts[3] === "True",
+    JSON.stringify({ ok: daclProbe.ok, status: daclProbe.status, probeText, stderr: daclProbe.stderr.trim() }),
+    cases,
+  );
 }
 
 async function main() {
@@ -2203,7 +2329,7 @@ async function main() {
     runPublishDecisionCases(cases);
     runReadinessCliCases(temp, fixture, cases);
     await runRestrictedLaunchCases(cases);
-    runRestrictedSyncAndGatePlanCases(cases);
+    runRestrictedSyncAndGatePlanCases(temp, cases);
     expectCheck(
       "release-verify accepts --allow-published (the publish rerun check)",
       (() => {

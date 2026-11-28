@@ -267,14 +267,23 @@ Failure modes and the chosen behavior:
    shared key: a policy can only be sure of values it wrote itself, and it learns that from `ListValue.Removed`, which the
    dialog fills with the entries the user deleted.
 9. **Additive removal is conservative.** An entry in `Removed` is removed only when the key holds a string value of that
-   name (the entry's stored name, or its data when it has none) with the same data, and the name is not also an entry of
-   the new list. A value whose data differs (someone else changed it) stays. `Removed` of a non-additive list is ignored
-   because the replace removes everything.
+   name (the entry's stored name, or its data when it has none) with the same data, and the name is not also an entry of the
+   new list. A value whose data differs (someone else changed it) stays. For an implicit list with `valuePrefix` present,
+   including an empty prefix, the UI reports an old row as kept only when its old name and data still match a final row's
+   generated name and data (`PolicyRules.ListEntryName`). Deleting or reordering a row can shift later generated names; if
+   removal only compared data, a shifted row could leave its old value name behind. Duplicate data is evaluated per generated
+   name. `explicitValue` lists compare names case-insensitively; lists with no prefix preserve the existing data comparison.
+   `Removed` of a non-additive list is ignored because the replace removes everything.
 10. **Unknown `**` instructions in a list key** are never touched by any state: not removed, not moved. They are
     owned records (`OwnedRecords`) but not entries.
 11. **Reader.** `**delvals.` is an instruction: never an entry, always an owned record of the list policy of its key
     (every record of a list key is owned). A `**delvals.` behind the entries (a file not written by this engine) still
     reads Enabled with the entries.
+12. **A prefixed additive list shrinks or reorders.** For old rows `alpha`, `bravo`, `charlie` stored as `Item1`, `Item2`,
+    `Item3`, deleting `bravo` leaves `alpha` at `Item1` and writes `charlie` at `Item2`. The removed set must include old
+    `Item2=bravo` and `Item3=charlie`, or stale `Item3=charlie` survives because the writer protects desired names. Deleting
+    the first row and reordering have the same risk. The writer's conditional data check still preserves a concurrently
+    changed old value. Reapplying the final list after a successful apply must be stable.
 
 ### 7.2 Changed expectations
 

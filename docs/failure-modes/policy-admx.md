@@ -68,8 +68,8 @@ decides whether to pass a folder that may be absent (the import store is passed 
 
 ### 6. Unreadable file
 
-Any I/O error while checking or reading a file (sharing violation, access denied, a path that vanished) fails with
-`Unreadable` and the HRESULT in `Detail`. It never escapes as an exception. Any other unexpected error while loading one
+Any I/O error while checking or reading a file (sharing violation, access denied, a path that vanished) fails with `Unreadable` and the HRESULT in `Detail`. `SafeXml.Load` checks reparse attributes with `File.GetAttributes` rather than `FileInfo.Attributes` (which returns `-1` for a missing or vanished file, whose bits include `ReparsePoint`), so a vanished file fails with `Unreadable` and never `ReparsePoint`.
+It never escapes as an exception. Any other unexpected error while loading one
 file is `InternalError` with the exception type name in `Detail`, and that file is dropped.
 
 ### 7. File name too long

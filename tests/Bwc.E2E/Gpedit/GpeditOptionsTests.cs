@@ -362,6 +362,37 @@ public sealed class GpeditOptionsTests
             }
         }
 
+        using (GpeditDialog? dialog = GpeditDialog.Open(run, "Long decimal required, soft, stored as text setting"))
+        {
+            checks.Record("longText.opens", dialog is not null, "the long decimal text policy opens.");
+            if (dialog is not null)
+            {
+                _ = dialog.Select(GpeditDialog.Enabled);
+                const string LongText = "textBoxRequired long number:";
+                string maximum = ulong.MaxValue.ToString(CultureInfo.InvariantCulture);
+                _ = dialog.TypeInto(LongText, maximum);
+                checks.Record(
+                    "longText.ulongMax",
+                    dialog.TextOf(LongText) == maximum && Number(dialog, "LongTextNumber") == maximum,
+                    $"field='{dialog.TextOf(LongText)}', readout={Number(dialog, "LongTextNumber")}, expected {maximum}.");
+
+                _ = dialog.TypeInto(LongText, string.Empty);
+                checks.Record(
+                    "longText.blankEditing",
+                    dialog.TextOf(LongText) == string.Empty && Number(dialog, "LongTextNumber") == maximum,
+                    $"blank field retains readout {Number(dialog, "LongTextNumber")}, expected {maximum}.");
+
+                const string Overflow = "18446744073709551616";
+                const string LastValidPrefix = "1844674407370955161";
+                _ = dialog.TypeInto(LongText, Overflow);
+                checks.Record(
+                    "longText.overflowTypedRejected",
+                    dialog.TextOf(LongText) == LastValidPrefix && Number(dialog, "LongTextNumber") == LastValidPrefix,
+                    $"overflow field='{dialog.TextOf(LongText)}', readout={Number(dialog, "LongTextNumber")}, expected valid prefix {LastValidPrefix}.");
+                Close(dialog);
+            }
+        }
+
         run.GoTo(Root, User, Admin, Oracle, "Elements", "Texts");
         using (GpeditDialog? dialog = GpeditDialog.Open(run, "Text with a length limit setting"))
         {
@@ -376,6 +407,76 @@ public sealed class GpeditOptionsTests
         }
 
         run.WriteArtifacts("gpedit-options-numbers.png");
+        checks.AssertAllPassed();
+    }
+
+    [TestMethod]
+    [TestCategory("Gpedit")]
+    [TestCategory("E2EOnly")]
+    public void Gpedit_Options_UnsignedLongDecimalSpinner()
+    {
+        E2EGuards.RequireE2EOnlyFlavor(GuiGate.Config);
+        var checks = new GpeditChecks("options", "unsigned-long-decimal");
+        const string name = "gpedit-options-unsigned-long-decimal";
+        GpeditSandbox sandbox = GpeditSandbox.Create(name);
+        sandbox.DialogEnabled = true;
+        sandbox.SeedStandard();
+        sandbox.UseTemplatesWithBadCases();
+        AddUnsignedLongDecimalTemplate(sandbox);
+        using GpeditRun run = GpeditRun.Open(name, sandbox);
+        run.GoTo(Root, Computer, Admin, Oracle, "Elements", "Numbers");
+
+        const string rowName = "Long decimal above signed maximum setting";
+        const string spinner = "numericUpDownWide number:";
+        string minimum = (long.MaxValue + 1UL).ToString(CultureInfo.InvariantCulture);
+        string maximum = ulong.MaxValue.ToString(CultureInfo.InvariantCulture);
+        using (GpeditDialog? dialog = GpeditDialog.Open(run, rowName))
+        {
+            checks.Record("opens", dialog is not null, "the unsigned long-decimal policy opens.");
+            if (dialog is null)
+            {
+                checks.AssertAllPassed();
+                return;
+            }
+
+            _ = dialog.Select(GpeditDialog.Enabled);
+            AutomationElement control = dialog.Find(spinner, 2)!;
+            checks.Record(
+                "full-range-automation",
+                control.Patterns.RangeValue.IsSupported &&
+                    control.Patterns.RangeValue.Pattern.Minimum.Value == (double)(long.MaxValue + 1UL) &&
+                    control.Patterns.RangeValue.Pattern.Maximum.Value == (double)ulong.MaxValue &&
+                    control.Patterns.RangeValue.Pattern.SmallChange.Value == (double)ulong.MaxValue &&
+                    dialog.TextOf(spinner + ".Text") == minimum,
+                $"min={control.Patterns.RangeValue.Pattern.Minimum.Value}, max={control.Patterns.RangeValue.Pattern.Maximum.Value}, step={control.Patterns.RangeValue.Pattern.SmallChange.Value}, text='{dialog.TextOf(spinner + ".Text")}'.");
+
+            _ = dialog.FocusControl(spinner + ".Text");
+            dialog.Press(VirtualKeyShort.UP);
+            checks.Record("step-to-max", Number(dialog, "WideNumber") == maximum, $"Up from the minimum gives {Number(dialog, "WideNumber")}, expected {maximum}.");
+            dialog.Press(VirtualKeyShort.DOWN);
+            checks.Record("step-to-min", Number(dialog, "WideNumber") == minimum, $"Down from the maximum gives {Number(dialog, "WideNumber")}, expected {minimum}.");
+            dialog.Press(VirtualKeyShort.DOWN);
+            checks.Record("clamp-min", Number(dialog, "WideNumber") == minimum, $"Down at the minimum gives {Number(dialog, "WideNumber")}, expected {minimum}.");
+            _ = dialog.TypeInto(spinner + ".Text", maximum);
+            dialog.Press(VirtualKeyShort.UP);
+            checks.Record("clamp-max", Number(dialog, "WideNumber") == maximum, $"Up at ulong.MaxValue gives {Number(dialog, "WideNumber")}, expected {maximum}.");
+            _ = dialog.Invoke(GpeditDialog.Apply);
+            checks.Record("applied", ShellRun.WaitUntil(() => !dialog.IsEnabled(GpeditDialog.Apply), TimeSpan.FromSeconds(3)), "Apply accepted the unsigned long-decimal maximum.");
+            _ = dialog.Invoke(GpeditDialog.Ok);
+            _ = dialog.WaitClosed();
+        }
+
+        using (GpeditDialog? again = GpeditDialog.Open(run, rowName))
+        {
+            checks.Record("reopens", again is not null, "the unsigned long-decimal policy reopens.");
+            if (again is not null)
+            {
+                checks.Record("maximum-kept", Number(again, "WideNumber") == maximum && again.TextOf(spinner + ".Text") == maximum, $"readout={Number(again, "WideNumber")}, text='{again.TextOf(spinner + ".Text")}', expected {maximum}.");
+                Close(again);
+            }
+        }
+
+        run.WriteArtifacts("gpedit-options-unsigned-long-decimal.png");
         checks.AssertAllPassed();
     }
 
@@ -612,6 +713,29 @@ public sealed class GpeditOptionsTests
 
             checks.Record("plain.caption", contents.Caption == ResourceText("Options", "ContentsCaption"), $"caption='{contents.Caption}'.");
             checks.Record("plain.oneColumn", contents.CellName(0, 0) == "Value, new row" && contents.Cell(0, 1) is null, $"first cell name='{contents.CellName(0, 0)}', second column cell present={contents.Cell(0, 1) is not null}.");
+            _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(contents.Cell(0, 0)!));
+            contents.Cell(0, 0)?.Focus();
+            Thread.Sleep(150);
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
+            Thread.Sleep(200);
+            bool escapeFromNewRowCloses = contents.WaitClosed();
+            checks.Record("plain.escapeFromNewRowCloses", escapeFromNewRowCloses, "Escape from the untouched trailing row cancels Show Contents.");
+            if (!escapeFromNewRowCloses)
+            {
+                _ = contents.Cancel();
+                _ = contents.WaitClosed();
+            }
+
+            checks.Record("plain.escapeFromNewRowKeeps", ListData(dialog, "PlainList").Length == 0, "Escape from the untouched trailing row leaves the list empty.");
+            _ = dialog.Invoke(PlainButton);
+            contents = GpeditContents.Wait(dialog);
+            checks.Record("plain.escapeReopens", contents is not null, "Show Contents reopens after Escape from its untouched trailing row.");
+            if (contents is null)
+            {
+                checks.AssertAllPassed();
+                return;
+            }
+
             contents.Edit(0, 0, "one");
             contents.Cell(1, 0)?.Focus();
             Thread.Sleep(150);
@@ -633,8 +757,23 @@ public sealed class GpeditOptionsTests
                 contents.Edit(1, 0, "two");
                 contents.Edit(2, 0, "three");
                 contents.DeleteRow(1);
-                _ = contents.Ok();
-                checks.Record("plain.okCloses", contents.WaitClosed(), "OK closes Show Contents.");
+                string trailingCellName = contents.CellName(2, 0);
+                _ = ClassicDialogTestsBridge.EnsureForeground(ClassicDialogTestsBridge.HandleOf(contents.Cell(2, 0)!));
+                contents.Cell(2, 0)?.Focus();
+                Thread.Sleep(150);
+                bool trailingCellFocused = dialog.FocusedId() == "dataGrid.R2C0";
+                Keyboard.Type(VirtualKeyShort.RETURN);
+                Thread.Sleep(200);
+                bool enterFromNewRowCloses = contents.WaitClosed();
+                checks.Record(
+                    "plain.enterFromNewRowCloses",
+                    trailingCellFocused && trailingCellName == "Value, new row" && enterFromNewRowCloses,
+                    $"Enter on the untouched trailing row closed Show Contents={enterFromNewRowCloses}, focused trailing cell={trailingCellFocused}, cell name='{trailingCellName}'.");
+                if (!enterFromNewRowCloses)
+                {
+                    _ = contents.Ok();
+                    _ = contents.WaitClosed();
+                }
             }
 
             checks.Record("plain.okKeeps", ListData(dialog, "PlainList").SequenceEqual(["one", "three"]), $"entries={string.Join("|", ListData(dialog, "PlainList"))}.");
@@ -684,26 +823,39 @@ public sealed class GpeditOptionsTests
                     List<string[]> rows = contents.Rows(2);
                     checks.Record("explicit.rows", rows.Count == 2 && rows[0].SequenceEqual(["first", "one"]) && rows[1].SequenceEqual(["second", "two"]), $"rows={string.Join(";", rows.Select(r => string.Join("=", r)))}.");
 
-                    // An entry with a name and no value is refused.
+                    // An explicit name with empty data is valid and reaches the policy value unchanged.
                     contents.Edit(2, 0, "third");
                     _ = contents.Ok();
-                    (string Caption, string Text)? message = dialog.WaitMessage();
-                    string expected = ResourceText("Options", "ContentsEmptyValue");
-                    checks.Record("explicit.emptyValueMessage", message is not null && message.Value.Text.Trim() == expected.Trim(), $"message={message?.Caption}|{message?.Text}.");
-                    _ = dialog.DismissMessage();
-                    checks.Record("explicit.emptyValueFocus", ShellRun.WaitUntil(() => dialog.FocusedId() == "dataGrid.R2C1", TimeSpan.FromSeconds(3)), $"focus='{dialog.FocusedId()}', expected the empty value cell dataGrid.R2C1.");
-                    contents.Edit(2, 1, "3");
+                    bool nameOnlyClosed = contents.WaitClosed();
+                    JsonElement? explicitValue = dialog.ValueOf("ExplicitList");
+                    bool nameOnlyStored = explicitValue is { } value && value.GetProperty("entries").EnumerateArray().Any(entry =>
+                        entry.GetProperty("n").GetString() == "third" && entry.GetProperty("d").GetString() == string.Empty);
+                    checks.Record("explicit.nameOnlyAccepted", nameOnlyClosed && nameOnlyStored && dialog.IsEnabled(GpeditDialog.Apply), $"closed={nameOnlyClosed}, stored={nameOnlyStored}, apply={dialog.IsEnabled(GpeditDialog.Apply)}.");
 
-                    // The same name twice is refused.
-                    contents.Edit(3, 0, "first");
-                    contents.Edit(3, 1, "x");
-                    _ = contents.Ok();
-                    message = dialog.WaitMessage();
-                    expected = string.Format(CultureInfo.CurrentCulture, ResourceText("Options", "ContentsDuplicateName"), "first");
-                    checks.Record("explicit.duplicateNameMessage", message is not null && message.Value.Text.Trim() == expected.Trim(), $"message={message?.Caption}|{message?.Text}.");
-                    _ = dialog.DismissMessage();
-                    _ = contents.Cancel();
-                    _ = contents.WaitClosed();
+                    _ = dialog.Invoke(ExplicitButton);
+                    contents = GpeditContents.Wait(dialog);
+                    checks.Record("explicit.nameOnlyShown", contents is not null && contents.Rows(2).Any(row => row.SequenceEqual(["third", string.Empty])), "the empty explicit value is present when Show Contents reopens.");
+                    if (contents is not null)
+                    {
+                        // An empty explicit name is still refused.
+                        contents.Edit(3, 1, "x");
+                        _ = contents.Ok();
+                        (string Caption, string Text)? message = dialog.WaitMessage();
+                        string expected = ResourceText("Options", "ContentsEmptyName");
+                        checks.Record("explicit.emptyNameMessage", message is not null && message.Value.Text.Trim() == expected.Trim(), $"message={message?.Caption}|{message?.Text}.");
+                        _ = dialog.DismissMessage();
+                        checks.Record("explicit.emptyNameFocus", ShellRun.WaitUntil(() => dialog.FocusedId() == "dataGrid.R3C0", TimeSpan.FromSeconds(3)), $"focus='{dialog.FocusedId()}', expected the empty name cell dataGrid.R3C0.");
+
+                        // The same name twice is still refused.
+                        contents.Edit(3, 0, "first");
+                        _ = contents.Ok();
+                        message = dialog.WaitMessage();
+                        expected = string.Format(CultureInfo.CurrentCulture, ResourceText("Options", "ContentsDuplicateName"), "first");
+                        checks.Record("explicit.duplicateNameMessage", message is not null && message.Value.Text.Trim() == expected.Trim(), $"message={message?.Caption}|{message?.Text}.");
+                        _ = dialog.DismissMessage();
+                        _ = contents.Cancel();
+                        _ = contents.WaitClosed();
+                    }
                 }
 
                 Close(dialog);
@@ -1135,6 +1287,60 @@ public sealed class GpeditOptionsTests
     }
 
     // ---- support -----------------------------------------------------------------------------------
+
+    private static void AddUnsignedLongDecimalTemplate(GpeditSandbox sandbox)
+    {
+        const string policyName = "Pol_LongDecimal_UnsignedRange";
+        const string elementId = "WideNumber";
+        const string valueName = "WideNumber";
+        const string key = @"Software\Policies\BWC-Oracle\Elements\Number";
+        string minimum = (long.MaxValue + 1UL).ToString(CultureInfo.InvariantCulture);
+        string maximum = ulong.MaxValue.ToString(CultureInfo.InvariantCulture);
+
+        string admxPath = Path.Combine(sandbox.TemplateRoot, "BwcOracle.admx");
+        XDocument admx = XDocument.Load(admxPath);
+        XElement admxRoot = admx.Root ?? throw new InvalidOperationException("The copied oracle ADMX has no root element.");
+        XNamespace admxNs = admxRoot.Name.Namespace;
+        XElement policies = admxRoot.Element(admxNs + "policies") ?? throw new InvalidOperationException("The copied oracle ADMX has no policies element.");
+        policies.Add(
+            new XElement(admxNs + "policy",
+                new XAttribute("name", policyName),
+                new XAttribute("class", "Machine"),
+                new XAttribute("displayName", $"$(string.{policyName})"),
+                new XAttribute("explainText", $"$(string.{policyName}_Help)"),
+                new XAttribute("presentation", $"$(presentation.{policyName})"),
+                new XAttribute("key", key),
+                new XElement(admxNs + "parentCategory", new XAttribute("ref", "Numbers")),
+                new XElement(admxNs + "supportedOn", new XAttribute("ref", "bwcbase:SUPPORTED_BwcAny")),
+                new XElement(admxNs + "elements",
+                    new XElement(admxNs + "longDecimal",
+                        new XAttribute("id", elementId),
+                        new XAttribute("valueName", valueName),
+                        new XAttribute("minValue", minimum),
+                        new XAttribute("maxValue", maximum)))));
+        admx.Save(admxPath);
+
+        string admlPath = Path.Combine(sandbox.TemplateRoot, "en-US", "BwcOracle.adml");
+        XDocument adml = XDocument.Load(admlPath);
+        XElement admlRoot = adml.Root ?? throw new InvalidOperationException("The copied oracle ADML has no root element.");
+        XNamespace admlNs = admlRoot.Name.Namespace;
+        XElement resources = admlRoot.Element(admlNs + "resources") ?? throw new InvalidOperationException("The copied oracle ADML has no resources element.");
+        XElement strings = resources.Element(admlNs + "stringTable") ?? throw new InvalidOperationException("The copied oracle ADML has no string table.");
+        strings.Add(
+            new XElement(admlNs + "string", new XAttribute("id", policyName), "Long decimal above signed maximum"),
+            new XElement(admlNs + "string", new XAttribute("id", policyName + "_Help"), "A long decimal from long.MaxValue + 1 through ulong.MaxValue."));
+        XElement presentations = resources.Element(admlNs + "presentationTable") ?? throw new InvalidOperationException("The copied oracle ADML has no presentation table.");
+        presentations.Add(
+            new XElement(admlNs + "presentation",
+                new XAttribute("id", policyName),
+                new XElement(admlNs + "longDecimalTextBox",
+                    new XAttribute("refId", elementId),
+                    new XAttribute("defaultValue", minimum),
+                    new XAttribute("spin", "true"),
+                    new XAttribute("spinStep", maximum),
+                    "Wide number:")));
+        adml.Save(admlPath);
+    }
 
     private static GpeditRun Start(string name, out GpeditSandbox sandbox)
     {

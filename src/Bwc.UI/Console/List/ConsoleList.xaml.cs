@@ -1087,10 +1087,20 @@ public sealed partial class ConsoleList : UserControl
         ItemsJustification = UniformGridLayoutItemsJustification.Start,
     };
 
+    /// <summary>The vertical StackLayout rounds each detail row to whole device pixels at the current scale.</summary>
+    private double ArrangedDetailRowHeight()
+    {
+        double rowHeight = ConsoleListMetrics.RowHeight;
+        double scale = XamlRoot?.RasterizationScale ?? 1.0;
+        return double.IsFinite(scale) && scale > 0
+            ? Math.Round(rowHeight * scale, MidpointRounding.AwayFromZero) / scale
+            : rowHeight;
+    }
+
     /// <summary>The size of one item in the current view mode, in DIPs.</summary>
     private Size ItemSize() => _mode switch
     {
-        ConsoleListViewMode.Detail => new Size(Math.Max(ColumnsTotalWidth, 1), ConsoleListMetrics.RowHeight),
+        ConsoleListViewMode.Detail => new Size(Math.Max(ColumnsTotalWidth, 1), ArrangedDetailRowHeight()),
         ConsoleListViewMode.LargeIcons => new Size(ConsoleListMetrics.LargeCellWidth, ConsoleListMetrics.LargeCellHeight),
         _ => new Size(_labelItemWidth, ConsoleListMetrics.RowHeight),
     };

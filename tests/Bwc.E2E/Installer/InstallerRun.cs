@@ -184,8 +184,9 @@ internal sealed class InstallerRun : IDisposable
 
     /// <summary>
     /// Runs the uninstaller silently. NSIS uninstallers may copy themselves out and return early, so the test waits
-    /// for the install folder to go, not for the process. The per-user run passes <see cref="ProgramDataRoot"/> as the
-    /// data-root seam unless <paramref name="withProgramData"/> is false.
+    /// for the install folder to go, not for the process. A per-user run waits for both its install folder and uninstall
+    /// key to disappear, since the detached uninstaller removes the key after deleting its folder. The per-user run passes
+    /// <see cref="ProgramDataRoot"/> as the data-root seam unless <paramref name="withProgramData"/> is false.
     /// </summary>
     public bool Uninstall(TimeSpan timeout, bool withProgramData = true)
     {
@@ -197,7 +198,8 @@ internal sealed class InstallerRun : IDisposable
             _ = process.WaitForExit(timeout);
         }
 
-        return WaitUntil(() => !Directory.Exists(InstallDir), timeout);
+        return WaitUntil(() =>
+            !Directory.Exists(InstallDir) && (Machine || !UninstallKeyExists()), timeout);
     }
 
     /// <summary>

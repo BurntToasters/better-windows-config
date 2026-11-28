@@ -594,6 +594,14 @@ public sealed class GpeditDialogTests
         checks.Record("navigationWorks", dialog.IsEnabled(GpeditDialog.Previous) && dialog.IsEnabled(GpeditDialog.Next), "Previous and Next still move.");
         bool changed = dialog.Select(GpeditDialog.Disabled);
         checks.Record("noChange", !changed || dialog.IsSelected(GpeditDialog.Enabled), "a state cannot be selected.");
+
+        // classic-dialog.md 3.6: a disabled radio button does not take its access key, as a disabled button does not.
+        _ = SendAltLetter('D');
+        Thread.Sleep(500);
+        checks.Record(
+            "altDoesNotChangeDisabledRadio",
+            dialog.IsSelected(GpeditDialog.Enabled) && !dialog.IsSelected(GpeditDialog.Disabled) && !dialog.IsEnabled(GpeditDialog.Apply),
+            $"after Alt+D: Enabled selected={dialog.IsSelected(GpeditDialog.Enabled)}, Disabled selected={dialog.IsSelected(GpeditDialog.Disabled)}, Apply enabled={dialog.IsEnabled(GpeditDialog.Apply)}.");
         SortedDictionary<string, string> hashes = sandbox.PolicyFileHashes();
         _ = dialog.Invoke(GpeditDialog.Ok);
         checks.Record("okCloses", dialog.WaitClosed(), "OK closes the dialog without applying (the notice says why).");

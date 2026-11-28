@@ -39,7 +39,9 @@ public enum ClassicControlKind
     /// <summary>
     /// Numeric up-down: a text box with spin buttons. Built as <see cref="ClassicSpinBox"/>. The range and step come from
     /// <see cref="ClassicControlDefinition.Minimum"/>, <see cref="ClassicControlDefinition.Maximum"/> and
-    /// <see cref="ClassicControlDefinition.Step"/>; <see cref="ClassicControlDefinition.Text"/> is its accessible name.
+    /// <see cref="ClassicControlDefinition.Step"/>; an unsigned policy number can instead use
+    /// <see cref="ClassicControlDefinition.UnsignedMinimum"/>, <see cref="ClassicControlDefinition.UnsignedMaximum"/> and
+    /// <see cref="ClassicControlDefinition.UnsignedStep"/>. <see cref="ClassicControlDefinition.Text"/> is its accessible name.
     /// </summary>
     Spinner,
 
@@ -111,6 +113,15 @@ public sealed record ClassicControlDefinition(
 
     /// <summary>Change of one Up, Down, or button press of a <see cref="ClassicControlKind.Spinner"/>. Positive.</summary>
     public long Step { get; init; } = 1;
+
+    /// <summary>Unsigned minimum for a spinner whose value is a non-negative 64-bit policy number.</summary>
+    public ulong? UnsignedMinimum { get; init; }
+
+    /// <summary>Unsigned maximum for a spinner whose value is a non-negative 64-bit policy number.</summary>
+    public ulong? UnsignedMaximum { get; init; }
+
+    /// <summary>Unsigned change of one Up, Down, or button press for a policy number spinner. Positive.</summary>
+    public ulong? UnsignedStep { get; init; }
 }
 
 /// <summary>

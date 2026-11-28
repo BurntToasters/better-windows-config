@@ -15,9 +15,13 @@ detail and the refusal reasons.
 
 ### 1. One-time VM setup
 
-1. Install Node 26.13.1 or newer (the `engines` value in `package.json`), the .NET SDK 10.0.403 or newer, NSIS 3.10 or newer
+1. Install Node 26.13.1 or newer (the `engines` value in `package.json`), the .NET SDK selected by
+   `global.json` (currently 10.0.404 with `rollForward: latestFeature`), NSIS 3.10 or newer
    (`makensis.exe` on PATH, or `NSIS_HOME` set), and GnuPG 2.4 or newer with the release signing
-   key imported.
+   key imported. Install Visual Studio Build Tools with the MSVC C++ x64 and ARM64 toolsets and
+   a native Windows SDK. The NativeAOT `BwcUpdate.exe` publish needs these native tools for both
+   RIDs; the repository does not pin a minimum Windows SDK version, and the full Visual Studio IDE
+   is optional.
 2. Run `gh auth login` for the account that can create releases in `BurntToasters/better-windows-config`.
 3. In an Administrator PowerShell, from the repository root, run `npm run setup:win:artifact-signing`.
    It installs the Artifact Signing client tools (see "Windows code signing" below).
@@ -73,7 +77,7 @@ This runs, in order:
 
 1. The stable policy (no beta overrides, no non-canonical GitHub target).
 2. `release:preflight --require-trusted-key`. Before anything is built, it checks the update key (decrypts, and is embedded in `TrustedKeys.cs`), the GPG key (a probe file is signed in a temporary folder), `AFTER_PACK_LOC` (exists, is writable, is outside the repository), the Azure variables and SignTool, `makensis.exe`, the Node version, that HEAD is pushed to `origin/main`, `gh auth status`, that no published release exists for the tag, and that the version is newer than the latest published release. Every local failure is listed in one run. The reasons are RP1 to RP24 in [failure-modes/release.md](failure-modes/release.md).
-3. The VM quality gate (`node scripts/test-all.js --quick --release-gate --rid all`). It runs all static checks, self-tests, both architecture builds (`build-arm64` and `build-x64`), all non-GUI `dotnet test` suites (automatically de-elevated through `scripts/run-restricted.ps1` when called from an elevated OpenSSH shell), and `test-policy-release-gate` last. GUI E2E steps are skipped here because they run locally before releasing. The gate stops at the first failure and writes `artifacts/gate/result.json`. Its steps run in this order:
+3. The VM quality gate (`node scripts/test-all.js --quick --release-gate --rid all`). It runs all static checks and self-tests, builds the solution for both architectures, runs the non-GUI `dotnet test` projects once on the host architecture, and runs `test-policy-release-gate` last on the host architecture (automatically de-elevated through `scripts/run-restricted.ps1` when called from an elevated OpenSSH shell). GUI E2E steps are skipped here because they run locally before releasing. The gate stops at the first failure and writes `artifacts/gate/result.json`. Its steps run in this order:
    - Shared steps, run once: `sync-version`, `sync-version-selftest`, `registry-writer`, `registry-writer-selftest`, `policy-writer`,
      `policy-writer-selftest`, `no-em-dash`, `no-em-dash-selftest`, `regedit-strings`, `tracked-paths-selftest`,
      `tracked-paths`, `oracle-json-selftest`, `oracle-json`, `e2e-timing-selftest`, `changelog-version`,
@@ -157,7 +161,8 @@ Run it only after a successful publish, on this disposable release VM. Git-ignor
 | Tool | Why |
 |------|-----|
 | Node 26.13.1 or newer | All scripts (`package.json` `engines`). |
-| .NET SDK 10.0.403 or newer | Only a non-dry-run publish uses it. |
+| .NET SDK selected by `global.json` (currently 10.0.404; `rollForward: latestFeature`) | Non-dry-run release builds and publishes use it. |
+| Visual Studio Build Tools with MSVC C++ x64 and ARM64 toolsets, plus a native Windows SDK | Required to publish the NativeAOT `BwcUpdate.exe` for both release RIDs; the repository does not pin a minimum Windows SDK version, and the full Visual Studio IDE is optional. |
 | NSIS 3.10+ | A real setup EXE. The dry run does not need it. |
 | GnuPG 2.4+ | Detached signatures of the release folder (`scripts/gpg-sign.js`). Used on the release VM only. |
 | GitHub CLI, authenticated | Only `--apply` for draft, verify, and publish. Dry runs never start `gh`. |
